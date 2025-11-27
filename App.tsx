@@ -27,8 +27,8 @@ const TEXT = {
     total: "总计",
     adminTitle: "管理员登陆",
     adminDesc: "请输入管理员密码以编辑内容。",
-    passPlaceholder: "请输入密码 (默认: 123)",
-    passError: "密码错误 (默认密码: 123)",
+    passPlaceholder: "请输入密码",
+    passError: "密码错误",
     confirm: "确认登陆",
     editTitle: "编辑提示词",
     lblTitle: "标题",
@@ -57,8 +57,8 @@ const TEXT = {
     total: "Total",
     adminTitle: "Admin Login",
     adminDesc: "Enter admin password to edit content.",
-    passPlaceholder: "Enter password (default: 123)",
-    passError: "Incorrect password (default: 123)",
+    passPlaceholder: "Enter password",
+    passError: "Incorrect password",
     confirm: "Login",
     editTitle: "Edit Prompt",
     lblTitle: "Title",
@@ -89,6 +89,7 @@ const App: React.FC = () => {
 
   // Login State
   const [loginPassword, setLoginPassword] = useState('');
+  const [sessionPassword, setSessionPassword] = useState(''); // Store verified password for API calls
   const [loginError, setLoginError] = useState('');
 
   // Edit Modal State
@@ -115,19 +116,36 @@ const App: React.FC = () => {
     fetchPrompts();
   }, []);
 
-  const handleLogin = () => {
-    if (loginPassword === '123') {
+  const handleLogin = async () => {
+    setIsLoading(true);
+    setLoginError('');
+    
+    try {
+      // Verify password with backend
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: loginPassword })
+      });
+
+      if (res.ok) {
         setUser(MOCK_USER);
+        setSessionPassword(loginPassword); // Store for future authorized requests
         setModalType(null);
         setLoginPassword('');
-        setLoginError('');
-    } else {
+      } else {
         setLoginError(t.passError);
+      }
+    } catch (error) {
+      setLoginError("Connection failed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleLogout = () => {
     setUser(null);
+    setSessionPassword('');
   };
 
   const handleLike = async (id: string) => {
@@ -145,6 +163,7 @@ const App: React.FC = () => {
       console.error("Local storage error", e);
     }
 
+    // Check if user has already liked this specific prompt 5 times today
     const currentLikesForThisPrompt = dailyLikesMap[id] || 0;
 
     if (currentLikesForThisPrompt >= 5) {
@@ -166,12 +185,11 @@ const App: React.FC = () => {
         body: JSON.stringify({ id })
       });
       
-      // Update local storage on success (or we could assume success)
+      // Update local storage on success
       dailyLikesMap[id] = currentLikesForThisPrompt + 1;
       localStorage.setItem(storageKey, JSON.stringify(dailyLikesMap));
     } catch (error) {
       console.error("Failed to like", error);
-      // Revert if failed (optional, skipped for simplicity)
     }
   };
 
@@ -195,7 +213,7 @@ const App: React.FC = () => {
       content: editFormContent,
       imageUrl: editFormImage,
       date: editFormDate,
-      authPassword: '123' // Sending password for simple server-side check
+      authPassword: sessionPassword // Send the verified session password
     };
 
     try {
@@ -221,7 +239,7 @@ const App: React.FC = () => {
         setModalType(null);
         setEditingPrompt(null);
       } else {
-        alert("Failed to save. check password or connection.");
+        alert("Failed to save. Authorization may have expired.");
       }
     } catch (error) {
       console.error("Save failed", error);
@@ -400,16 +418,15 @@ const App: React.FC = () => {
         </div>
 
         {/* Loading State */}
-        {isLoading && (
+        {isLoading && !user && !loginError ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-500 font-bold">
              <Loader2 size={48} className="animate-spin mb-4 text-black" />
              {t.loading}
           </div>
-        )}
+        ) : null}
 
         {/* Grid */}
-        {!isLoading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {prompts.map((prompt) => (
               <PromptCard 
                   key={prompt.id} 
@@ -420,8 +437,7 @@ const App: React.FC = () => {
                   lang={lang}
               />
             ))}
-          </div>
-        )}
+        </div>
       </main>
 
       {/* --- MODALS --- */}
@@ -441,11 +457,12 @@ const App: React.FC = () => {
               onChange={(e) => setLoginPassword(e.target.value)}
               className="w-full border-2 border-black p-3 outline-none focus:bg-yellow-50 font-bold text-lg" 
               onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              disabled={isLoading}
             />
             {loginError && <div className="text-red-600 font-bold text-sm bg-red-100 p-2 border border-red-500">{loginError}</div>}
             
-            <NeoButton variant="dark" className="w-full mt-2" onClick={handleLogin}>
-               {t.confirm}
+            <NeoButton variant="dark" className="w-full mt-2" onClick={handleLogin} disabled={isLoading}>
+               {isLoading ? <Loader2 className="animate-spin mx-auto"/> : t.confirm}
             </NeoButton>
          </div>
       </Modal>
