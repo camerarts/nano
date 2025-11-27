@@ -13,6 +13,11 @@ const MOCK_USER: User = {
   isAdmin: true
 };
 
+const DEFAULT_CONTENT = {
+  zh: "在此处输入提示词...",
+  en: "Enter prompt here..."
+};
+
 const TEXT = {
   zh: {
     subtitle: "提示词库",
@@ -258,7 +263,7 @@ const App: React.FC = () => {
     const newPrompt: Prompt = {
         id: Date.now().toString(),
         title: lang === 'zh' ? "新提示词" : "New Prompt",
-        content: lang === 'zh' ? "在此处输入提示词..." : "Enter prompt here...",
+        content: lang === 'zh' ? DEFAULT_CONTENT.zh : DEFAULT_CONTENT.en,
         author: user?.username || "Admin",
         date: localIso,
         tags: ["New"],
@@ -313,10 +318,18 @@ const App: React.FC = () => {
     if (file) processImageFile(file);
   };
 
+  // Check if text is one of the default placeholders
+  const isDefaultContent = (text: string) => {
+    return text === DEFAULT_CONTENT.zh || text === DEFAULT_CONTENT.en;
+  };
+
   const handleClipboardPasteButton = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      setEditFormContent(prev => prev + text);
+      setEditFormContent(prev => {
+        if (isDefaultContent(prev)) return text;
+        return prev + text;
+      });
     } catch (error) {
       console.error('Failed to read clipboard', error);
     }
@@ -347,7 +360,10 @@ const App: React.FC = () => {
             const text = e.clipboardData.getData('text');
             if (text) {
                 e.preventDefault();
-                setEditFormContent(prev => prev + (prev ? '\n' : '') + text);
+                setEditFormContent(prev => {
+                    if (isDefaultContent(prev)) return text;
+                    return prev + (prev ? '\n' : '') + text;
+                });
             }
         }
         // Otherwise let default behavior happen (pasting into Title or Content inputs)
@@ -369,6 +385,13 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* New Prompt Button - Moved here */}
+            {user && (
+                 <NeoButton variant="primary" onClick={handleCreateNew} className="flex items-center gap-2 animate-bounce hover:animate-none md:mr-2">
+                    <Plus size={20} /> <span className="hidden sm:inline">{t.newPrompt}</span>
+                 </NeoButton>
+            )}
+
             <NeoButton 
                 variant="white" 
                 size="sm" 
@@ -432,11 +455,7 @@ const App: React.FC = () => {
                  <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.public}</span>
               </div>
               
-              {user && (
-                 <NeoButton variant="primary" onClick={handleCreateNew} className="flex items-center gap-2 animate-bounce hover:animate-none">
-                    <Plus size={20} /> {t.newPrompt}
-                 </NeoButton>
-              )}
+              {/* Button moved from here to Header */}
            </div>
         </div>
       </section>
@@ -577,6 +596,11 @@ const App: React.FC = () => {
                <textarea 
                   value={editFormContent} 
                   onChange={(e) => setEditFormContent(e.target.value)}
+                  onFocus={() => {
+                     if (isDefaultContent(editFormContent)) {
+                        setEditFormContent('');
+                     }
+                  }}
                   className="w-full border-2 border-black p-2 h-32 resize-none outline-none font-mono text-sm leading-relaxed focus:shadow-neo-sm transition-shadow" 
                />
             </div>
