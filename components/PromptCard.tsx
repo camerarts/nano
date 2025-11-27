@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Prompt } from '../types';
-import { Heart, Copy, Edit2, CornerDownRight } from 'lucide-react';
+import { Heart, Copy, Edit2, CornerDownRight, Star } from 'lucide-react';
 import { NeoButton } from './ui/NeoButton';
 
 interface PromptCardProps {
@@ -79,13 +80,15 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
     }
   };
 
+  const rating = prompt.rating || 0;
+
   return (
     <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200">
       
       {/* Header / Meta */}
-      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50">
+      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-12">
         <div className="flex items-center gap-2">
-           {/* Date with tooltip, Author removed as requested */}
+           {/* Date with tooltip */}
            <span 
              className="text-xs font-bold text-gray-600 cursor-help" 
              title={getFullDate(prompt.date)}
@@ -93,11 +96,27 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
              {getRelativeTime(prompt.date)}
            </span>
         </div>
-        {prompt.isOfficial && (
-          <span className="bg-banana-yellow text-[10px] px-2 py-0.5 border border-black font-bold rotate-[-2deg]">
-            {t.official}
-          </span>
-        )}
+        
+        <div className="flex items-center gap-2">
+          {/* Rating Stars */}
+          {rating > 0 && (
+            <div className="flex gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <Star 
+                  key={i} 
+                  size={12} 
+                  className={i < rating ? "fill-black text-black" : "text-gray-300"} 
+                />
+              ))}
+            </div>
+          )}
+
+          {prompt.isOfficial && (
+            <span className="bg-banana-yellow text-[10px] px-2 py-0.5 border border-black font-bold rotate-[-2deg]">
+              {t.official}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Image / Content Area */}
