@@ -348,7 +348,7 @@ const App: React.FC = () => {
         <div className="absolute top-1/2 left-1/4 w-4 h-4 bg-black rounded-full"></div>
         <div className="absolute bottom-20 left-20 w-8 h-8 border-2 border-black bg-white transform rotate-45"></div>
 
-        <div className="container mx-auto max-w-5xl relative z-10">
+        <div className="container mx-auto max-w-6xl relative z-10">
            <div className="bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-12 md:p-20 relative overflow-hidden group hover:translate-x-1 hover:translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="absolute top-0 left-0 w-full h-2 bg-black"></div>
               <div className="absolute bottom-0 left-0 w-full h-2 bg-black"></div>
@@ -358,12 +358,12 @@ const App: React.FC = () => {
               <Sparkles className="absolute bottom-6 left-6 text-neo-red w-8 h-8 animate-pulse delay-75" />
 
               <div className="flex flex-col items-center justify-center text-center">
-                 <h1 className="text-5xl md:text-7xl lg:text-8xl font-black text-black tracking-tighter drop-shadow-sm mb-4">
+                 <h1 className="text-6xl md:text-8xl lg:text-9xl font-black italic text-black tracking-tighter leading-none mb-6 drop-shadow-[5px_5px_0px_rgba(255,255,255,1)] select-none scale-y-105">
                    {t.heroTitle}
                  </h1>
                  <div className="flex gap-4 items-center flex-wrap justify-center">
-                    <span className="bg-black text-white px-4 py-1 font-bold text-lg rotate-2">{t.quality}</span>
-                    <span className="bg-banana-yellow border-2 border-black px-4 py-1 font-bold text-lg -rotate-2">{t.curated}</span>
+                    <span className="bg-black text-white px-4 py-1 font-bold text-lg rotate-2 shadow-[2px_2px_0px_#fff]">{t.quality}</span>
+                    <span className="bg-banana-yellow border-2 border-black px-4 py-1 font-bold text-lg -rotate-2 shadow-[2px_2px_0px_#000]">{t.curated}</span>
                  </div>
               </div>
            </div>
