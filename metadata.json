@@ -1,0 +1,5 @@
+{
+  "name": "Nano Banana Prompts",
+  "description": "A high-contrast, brutalist-style prompt engineering library. Generate optimized prompts using Gemini, share them, and manage your collection.",
+  "requestFramePermissions": []
+}
