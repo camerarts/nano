@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
@@ -33,6 +33,7 @@ const TEXT = {
     public: "公开",
     newPrompt: "新增提示词",
     latest: "最新提示词",
+    sortRating: "提示词排序",
     total: "总计",
     adminTitle: "管理员登陆",
     adminDesc: "请输入管理员密码以编辑内容。",
@@ -64,6 +65,7 @@ const TEXT = {
     public: "PUBLIC",
     newPrompt: "New Prompt",
     latest: "Latest Prompts",
+    sortRating: "Sort by Rating",
     total: "Total",
     adminTitle: "Admin Login",
     adminDesc: "Enter admin password to edit content.",
@@ -96,6 +98,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'date' | 'rating'>('date');
   
   const t = TEXT[lang];
 
@@ -148,6 +151,24 @@ const App: React.FC = () => {
     };
     fetchPrompts();
   }, []);
+
+  // Memoized Sorted Prompts
+  const sortedPrompts = useMemo(() => {
+    const p = [...prompts];
+    if (sortBy === 'rating') {
+      // Sort by Rating Desc, then Likes Desc, then Date Desc
+      return p.sort((a, b) => {
+        const ratingDiff = (b.rating || 0) - (a.rating || 0);
+        if (ratingDiff !== 0) return ratingDiff;
+        const likeDiff = b.likes - a.likes;
+        if (likeDiff !== 0) return likeDiff;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+    } else {
+      // Sort by Date Desc (Default)
+      return p.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }
+  }, [prompts, sortBy]);
 
   const handleLogin = async () => {
     if (!loginPassword.trim()) return;
@@ -513,15 +534,35 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 -mt-10 relative z-20">
         
         {/* Search Bar / Status */}
-        <div className="flex justify-between items-center mb-8 bg-banana-bg">
-           <div className="flex items-center gap-2">
-              <h2 className="text-2xl font-black bg-white border-2 border-black px-4 py-2 shadow-neo flex items-center gap-2">
+        <div className="flex justify-between items-center mb-8 bg-banana-bg flex-wrap gap-4">
+           <div className="flex items-center gap-4">
+              {/* Latest (Date) Sort */}
+              <button 
+                onClick={() => setSortBy('date')}
+                className={`text-xl md:text-2xl font-black border-2 border-black px-4 py-2 flex items-center gap-2 transition-all duration-200
+                  ${sortBy === 'date' 
+                    ? 'bg-white shadow-neo scale-100 z-10' 
+                    : 'bg-gray-200 text-gray-500 shadow-none hover:bg-gray-100'}
+                `}
+              >
                  <Search size={24} strokeWidth={3} /> {t.latest}
-              </h2>
+              </button>
+
+              {/* Rating Sort */}
+              <button 
+                onClick={() => setSortBy('rating')}
+                className={`text-xl md:text-2xl font-black border-2 border-black px-4 py-2 flex items-center gap-2 transition-all duration-200
+                  ${sortBy === 'rating' 
+                    ? 'bg-white shadow-neo scale-100 z-10' 
+                    : 'bg-gray-200 text-gray-500 shadow-none hover:bg-gray-100'}
+                `}
+              >
+                 <ArrowUpDown size={24} strokeWidth={3} /> {t.sortRating}
+              </button>
            </div>
            
            <div className="bg-banana-yellow border-2 border-black px-4 py-2 font-bold shadow-neo">
-              {t.total}: {isLoading ? '...' : prompts.length}
+              {t.total}: {isLoading ? '...' : sortedPrompts.length}
            </div>
         </div>
 
@@ -535,7 +576,7 @@ const App: React.FC = () => {
 
         {/* Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {prompts.map((prompt) => (
+            {sortedPrompts.map((prompt) => (
               <PromptCard 
                   key={prompt.id} 
                   prompt={prompt} 
