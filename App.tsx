@@ -5,6 +5,7 @@ import { Prompt, User, ModalType } from './types';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
 import { Modal } from './components/Modal';
+import { Lightbox } from './components/Lightbox';
 
 // --- MOCK USER (Auth handled simply) ---
 const MOCK_USER: User = {
@@ -94,6 +95,7 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   
   const t = TEXT[lang];
 
@@ -540,6 +542,7 @@ const App: React.FC = () => {
                   canEdit={!!user} 
                   onEdit={openEditModal}
                   onLike={handleLike}
+                  onImageClick={setLightboxUrl}
                   lang={lang}
               />
             ))}
@@ -547,6 +550,9 @@ const App: React.FC = () => {
       </main>
 
       {/* --- MODALS --- */}
+
+      {/* Lightbox */}
+      <Lightbox imageUrl={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       
       {/* Login Modal */}
       <Modal 
