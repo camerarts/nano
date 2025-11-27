@@ -1,3 +1,4 @@
+
 export interface Prompt {
   id: string;
   title: string;
@@ -8,6 +9,7 @@ export interface Prompt {
   likes: number;
   imageUrl?: string;
   isOfficial?: boolean;
+  rating?: number; // 1-5
 }
 
 export interface User {
