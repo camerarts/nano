@@ -107,9 +107,6 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
         {prompt.imageUrl && (
           <div className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group">
              <img src={prompt.imageUrl} alt={prompt.title} className="w-full h-full object-cover" />
-             <div className="absolute bottom-2 right-2 bg-black text-white text-xs px-2 py-1 font-mono">
-                16:9
-             </div>
           </div>
         )}
 
