@@ -31,9 +31,10 @@ export async function onRequestPost(context) {
   try {
     const data = await request.json();
     
-    // 简单的鉴权：检查请求体中是否包含正确的管理员密码 (这里复用前端的 '123' 逻辑，生产环境建议更严格)
-    // 注意：我们在 App.tsx 发送请求时需要附带 password 字段
-    if (data.authPassword !== '123') {
+    // 鉴权：检查请求体中的 authPassword 是否匹配 Cloudflare 环境变量 PASSWORD
+    const validPassword = env.PASSWORD || '123';
+    
+    if (data.authPassword !== validPassword) {
        return new Response("Unauthorized", { status: 401 });
     }
 
