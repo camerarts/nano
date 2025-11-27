@@ -117,6 +117,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = async () => {
+    if (!loginPassword.trim()) return;
+    
     setIsLoading(true);
     setLoginError('');
     
@@ -125,12 +127,12 @@ const App: React.FC = () => {
       const res = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: loginPassword })
+        body: JSON.stringify({ password: loginPassword.trim() })
       });
 
       if (res.ok) {
         setUser(MOCK_USER);
-        setSessionPassword(loginPassword); // Store for future authorized requests
+        setSessionPassword(loginPassword.trim()); // Store for future authorized requests
         setModalType(null);
         setLoginPassword('');
       } else {
