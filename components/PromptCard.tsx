@@ -9,6 +9,7 @@ interface PromptCardProps {
   canEdit: boolean;
   onEdit: (prompt: Prompt) => void;
   onLike: (id: string) => void;
+  onImageClick?: (url: string) => void;
   lang: 'zh' | 'en';
 }
 
@@ -37,7 +38,7 @@ const LABELS = {
   }
 };
 
-export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit, onLike, lang }) => {
+export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit, onLike, onImageClick, lang }) => {
   const [copied, setCopied] = React.useState(false);
   const t = LABELS[lang];
 
@@ -83,10 +84,10 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
   const rating = prompt.rating || 0;
 
   return (
-    <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200">
+    <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative">
       
       {/* Header / Meta */}
-      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-12">
+      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-14">
         <div className="flex items-center gap-2">
            {/* Date with tooltip */}
            <span 
@@ -98,21 +99,22 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
         </div>
         
         <div className="flex items-center gap-2">
-          {/* Rating Stars */}
+          {/* Rating Sticker - High Contrast "Sticker" Style */}
           {rating > 0 && (
-            <div className="flex gap-0.5">
+            <div className="flex items-center gap-0.5 bg-banana-yellow border-2 border-black px-1.5 py-0.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] rotate-[-2deg] mr-1 select-none">
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
-                  size={12} 
-                  className={i < rating ? "fill-black text-black" : "text-gray-300"} 
+                  size={10} 
+                  className={i < rating ? "fill-black text-black" : "fill-transparent text-black/20"} 
+                  strokeWidth={3}
                 />
               ))}
             </div>
           )}
 
           {prompt.isOfficial && (
-            <span className="bg-banana-yellow text-[10px] px-2 py-0.5 border border-black font-bold rotate-[-2deg]">
+            <span className="bg-neo-red text-white text-[10px] px-2 py-0.5 border-2 border-black font-bold rotate-[2deg] shadow-[2px_2px_0px_rgba(0,0,0,1)] select-none">
               {t.official}
             </span>
           )}
@@ -124,13 +126,22 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
         <h3 className="font-bold text-lg leading-tight">{prompt.title}</h3>
         
         {prompt.imageUrl && (
-          <div className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group">
-             <img src={prompt.imageUrl} alt={prompt.title} className="w-full h-full object-cover" />
+          <div 
+            className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group cursor-zoom-in"
+            onClick={() => onImageClick && onImageClick(prompt.imageUrl!)}
+          >
+             <img 
+               src={prompt.imageUrl} 
+               alt={prompt.title} 
+               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+             />
+             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+             </div>
           </div>
         )}
 
         {/* The Prompt Box */}
-        <div className="relative bg-gray-100 border-2 border-black p-3 text-sm font-mono mt-auto">
+        <div className="relative bg-gray-100 border-2 border-black p-3 text-sm font-mono mt-auto shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
            <CornerDownRight className="absolute top-2 left-2 w-4 h-4 text-gray-400" />
            <p className="pl-6 pt-1 line-clamp-4 text-gray-700">
              {prompt.content}
@@ -147,9 +158,9 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
          <div className="flex gap-2">
             <button 
                 onClick={() => onLike(prompt.id)}
-                className="p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-white flex items-center gap-1 text-xs font-bold active:bg-red-50"
+                className="p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-white flex items-center gap-1 text-xs font-bold active:bg-red-50 group"
             >
-               <Heart size={14} className={prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"} />
+               <Heart size={14} className={`transition-transform group-hover:scale-110 ${prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"}`} />
                {prompt.likes}
             </button>
             
