@@ -87,7 +87,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
     <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative">
       
       {/* Header / Meta */}
-      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-14">
+      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-16">
         <div className="flex items-center gap-2">
            {/* Date with tooltip */}
            <span 
@@ -98,16 +98,16 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
            </span>
         </div>
         
-        <div className="flex items-center gap-2">
-          {/* Rating Sticker - High Contrast "Sticker" Style */}
+        <div className="flex items-center gap-3">
+          {/* Rating Sticker - Bigger and Bolder */}
           {rating > 0 && (
-            <div className="flex items-center gap-0.5 bg-banana-yellow border-2 border-black px-1.5 py-0.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] rotate-[-2deg] mr-1 select-none">
+            <div className="flex items-center gap-1 bg-banana-yellow border-2 border-black px-2 py-1.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] mr-2 select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
-                  size={10} 
+                  size={16} 
                   className={i < rating ? "fill-black text-black" : "fill-transparent text-black/20"} 
-                  strokeWidth={3}
+                  strokeWidth={2.5}
                 />
               ))}
             </div>
@@ -123,11 +123,11 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
 
       {/* Image / Content Area */}
       <div className="p-4 flex-grow flex flex-col gap-4">
-        <h3 className="font-bold text-lg leading-tight">{prompt.title}</h3>
+        <h3 className="font-bold text-xl leading-tight">{prompt.title}</h3>
         
         {prompt.imageUrl && (
           <div 
-            className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group cursor-zoom-in"
+            className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group cursor-zoom-in shadow-sm"
             onClick={() => onImageClick && onImageClick(prompt.imageUrl!)}
           >
              <img 
