@@ -13,6 +13,9 @@ const MOCK_USER: User = {
   isAdmin: true
 };
 
+const SESSION_KEY = 'nano_admin_session';
+const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
+
 const DEFAULT_CONTENT = {
   zh: "在此处输入提示词...",
   en: "Enter prompt here..."
@@ -41,6 +44,7 @@ const TEXT = {
     lblUpload: "或上传图片 (自动裁剪16:9)",
     lblContent: "提示词文本",
     lblDate: "上传日期 (精确到小时)",
+    lblRating: "评级",
     cancel: "取消",
     save: "保存修改",
     preview: "预览",
@@ -71,6 +75,7 @@ const TEXT = {
     lblUpload: "Or Upload Image (Auto-crop 16:9)",
     lblContent: "Prompt Content",
     lblDate: "Date (Hour precision)",
+    lblRating: "Rating",
     cancel: "Cancel",
     save: "Save Changes",
     preview: "PREVIEW",
@@ -102,6 +107,27 @@ const App: React.FC = () => {
   const [editFormContent, setEditFormContent] = useState('');
   const [editFormImage, setEditFormImage] = useState('');
   const [editFormDate, setEditFormDate] = useState('');
+  const [editFormRating, setEditFormRating] = useState(0);
+
+  // Restore Session on Mount
+  useEffect(() => {
+    const stored = localStorage.getItem(SESSION_KEY);
+    if (stored) {
+      try {
+        const { password, timestamp } = JSON.parse(stored);
+        if (Date.now() - timestamp < SESSION_DURATION) {
+          // Session is valid
+          setUser(MOCK_USER);
+          setSessionPassword(password);
+        } else {
+          // Session expired
+          localStorage.removeItem(SESSION_KEY);
+        }
+      } catch (e) {
+        localStorage.removeItem(SESSION_KEY);
+      }
+    }
+  }, []);
 
   // Fetch Prompts from Cloudflare API
   useEffect(() => {
@@ -136,8 +162,16 @@ const App: React.FC = () => {
       });
 
       if (res.ok) {
+        const pass = loginPassword.trim();
         setUser(MOCK_USER);
-        setSessionPassword(loginPassword.trim()); // Store for future authorized requests
+        setSessionPassword(pass);
+        
+        // Save Session
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+          password: pass,
+          timestamp: Date.now()
+        }));
+
         setModalType(null);
         setLoginPassword('');
       } else {
@@ -153,6 +187,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setUser(null);
     setSessionPassword('');
+    localStorage.removeItem(SESSION_KEY);
   };
 
   const handleLike = async (id: string) => {
@@ -205,6 +240,7 @@ const App: React.FC = () => {
     setEditFormTitle(prompt.title);
     setEditFormContent(prompt.content);
     setEditFormImage(prompt.imageUrl || '');
+    setEditFormRating(prompt.rating || 0);
     const formattedDate = prompt.date.length > 16 ? prompt.date.substring(0, 16) : prompt.date;
     setEditFormDate(formattedDate);
     setModalType('EDIT');
@@ -220,6 +256,7 @@ const App: React.FC = () => {
       content: editFormContent,
       imageUrl: editFormImage,
       date: editFormDate,
+      rating: editFormRating,
       authPassword: sessionPassword // Send the verified session password
     };
 
@@ -243,10 +280,21 @@ const App: React.FC = () => {
           }
         });
         
+        // Refresh session timestamp on activity
+        localStorage.setItem(SESSION_KEY, JSON.stringify({
+          password: sessionPassword,
+          timestamp: Date.now()
+        }));
+
         setModalType(null);
         setEditingPrompt(null);
       } else {
-        alert("Failed to save. Authorization may have expired.");
+        if (res.status === 401) {
+            alert("Session expired. Please login again.");
+            handleLogout();
+        } else {
+            alert("Failed to save.");
+        }
       }
     } catch (error) {
       console.error("Save failed", error);
@@ -268,7 +316,8 @@ const App: React.FC = () => {
         date: localIso,
         tags: ["New"],
         likes: 0,
-        imageUrl: '' // Empty by default
+        imageUrl: '', // Empty by default
+        rating: 5
     };
     
     // Just open modal, don't save to API yet
@@ -454,8 +503,6 @@ const App: React.FC = () => {
                  <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.ver}</span>
                  <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.public}</span>
               </div>
-              
-              {/* Button moved from here to Header */}
            </div>
         </div>
       </section>
@@ -548,6 +595,24 @@ const App: React.FC = () => {
                   onChange={(e) => setEditFormTitle(e.target.value)}
                   className="w-full border-2 border-black p-2 outline-none font-bold text-lg focus:shadow-neo-sm transition-shadow" 
                />
+            </div>
+
+            <div>
+               <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblRating}</label>
+               <div className="flex gap-1 border-2 border-black w-fit p-1 bg-white">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button 
+                      key={star} 
+                      onClick={() => setEditFormRating(star)}
+                      className="transition-transform hover:scale-110"
+                    >
+                       <Star 
+                         size={24} 
+                         className={star <= editFormRating ? "fill-banana-yellow text-black" : "text-gray-300"} 
+                       />
+                    </button>
+                  ))}
+               </div>
             </div>
 
             <div>
