@@ -261,18 +261,15 @@ const App: React.FC = () => {
         date: localIso,
         tags: ["New"],
         likes: 0,
-        imageUrl: `https://picsum.photos/800/450?random=${Date.now()}`
+        imageUrl: '' // Empty by default
     };
     
     // Just open modal, don't save to API yet
     openEditModal(newPrompt);
   };
 
-  // Image processing: Auto-crop to 16:9
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // Reusable Image Processing Logic (Crop to 16:9)
+  const processImageFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -282,7 +279,9 @@ const App: React.FC = () => {
         let drawWidth = img.width;
         let drawHeight = img.width / targetRatio;
 
+        // Ensure we don't crop out empty space, center crop strategy
         if (drawHeight > img.height) {
+          // If calculated height is larger than actual, we are width-limited
           drawHeight = img.height;
           drawWidth = img.height * targetRatio;
         }
@@ -295,8 +294,10 @@ const App: React.FC = () => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
+        // Center the crop
         const sx = (img.width - drawWidth) / 2;
         const sy = (img.height - drawHeight) / 2;
+        
         ctx.drawImage(img, sx, sy, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
         setEditFormImage(canvas.toDataURL('image/jpeg', 0.85));
       };
@@ -305,12 +306,49 @@ const App: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const handlePasteContent = async () => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processImageFile(file);
+  };
+
+  const handleClipboardPasteButton = async () => {
     try {
       const text = await navigator.clipboard.readText();
       setEditFormContent(prev => prev + text);
     } catch (error) {
       console.error('Failed to read clipboard', error);
+    }
+  };
+
+  // Global Paste Handler for Modal
+  const handleModalPaste = (e: React.ClipboardEvent) => {
+    // 1. Check for Image in clipboard
+    const items = e.clipboardData.items;
+    let hasImage = false;
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+            e.preventDefault();
+            const file = items[i].getAsFile();
+            if (file) processImageFile(file);
+            hasImage = true;
+            return; // Stop processing if image found
+        }
+    }
+
+    // 2. Handle Text if not focused on inputs
+    if (!hasImage) {
+        const activeEl = document.activeElement;
+        const isInputFocused = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement;
+        
+        // If user is just pasting into the modal without specific focus, assume content text
+        if (!isInputFocused) {
+            const text = e.clipboardData.getData('text');
+            if (text) {
+                e.preventDefault();
+                setEditFormContent(prev => prev + (prev ? '\n' : '') + text);
+            }
+        }
+        // Otherwise let default behavior happen (pasting into Title or Content inputs)
     }
   };
 
@@ -473,7 +511,8 @@ const App: React.FC = () => {
         onClose={() => !isSaving && setModalType(null)}
         title={t.editTitle}
       >
-         <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2 relative">
+         {/* Added onPaste handler to the container */}
+         <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2 relative" onPaste={handleModalPaste}>
             {isSaving && (
                <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center font-black text-xl">
                   <Loader2 className="animate-spin mr-2"/> {t.saving}
@@ -514,10 +553,14 @@ const App: React.FC = () => {
                    </div>
                </div>
 
-               {editFormImage && (
+               {editFormImage ? (
                  <div className="mt-2 w-full aspect-video border-2 border-black bg-gray-100 overflow-hidden relative">
-                    <img src={editFormImage} alt="Preview" className="w-full h-full object-cover opacity-80" />
+                    <img src={editFormImage} alt="Preview" className="w-full h-full object-cover" />
                     <span className="absolute bottom-0 right-0 bg-black text-white text-xs px-1">{t.preview}</span>
+                 </div>
+               ) : (
+                 <div className="mt-2 w-full aspect-video border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
+                    No Image
                  </div>
                )}
             </div>
@@ -525,7 +568,7 @@ const App: React.FC = () => {
             <div>
                <div className="flex justify-between items-end mb-1">
                   <label className="block text-xs font-bold uppercase bg-black text-white w-fit px-1">{t.lblContent}</label>
-                  <button onClick={handlePasteContent} className="text-xs flex items-center gap-1 font-bold hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300">
+                  <button onClick={handleClipboardPasteButton} className="text-xs flex items-center gap-1 font-bold hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-300">
                      <ClipboardPaste size={12} /> {t.paste}
                   </button>
                </div>
