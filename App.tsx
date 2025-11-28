@@ -511,7 +511,7 @@ const App: React.FC = () => {
               <Sparkles className="absolute bottom-6 left-6 text-neo-red w-8 h-8 animate-pulse delay-75" />
 
               <div className="flex flex-col items-center justify-center text-center">
-                 <h1 className="text-6xl md:text-8xl lg:text-9xl font-black italic text-black tracking-tighter leading-none mb-6 drop-shadow-[5px_5px_0px_rgba(255,255,255,1)] select-none scale-y-105">
+                 <h1 className="text-5xl md:text-8xl lg:text-9xl font-black italic text-black tracking-tighter leading-none mb-6 drop-shadow-[5px_5px_0px_rgba(255,255,255,1)] select-none scale-y-105">
                    {t.heroTitle}
                  </h1>
                  <div className="flex gap-4 items-center flex-wrap justify-center">
@@ -531,37 +531,37 @@ const App: React.FC = () => {
       </section>
 
       {/* --- CONTENT GRID --- */}
-      <main className="container mx-auto px-4 -mt-10 relative z-20">
+      <main className="container mx-auto px-2 md:px-4 -mt-10 relative z-20">
         
         {/* Search Bar / Status */}
         <div className="flex justify-between items-center mb-8 bg-banana-bg flex-wrap gap-4">
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2 md:gap-4">
               {/* Latest (Date) Sort */}
               <button 
                 onClick={() => setSortBy('date')}
-                className={`text-xl md:text-2xl font-black border-2 border-black px-4 py-2 flex items-center gap-2 transition-all duration-200
+                className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
                   ${sortBy === 'date' 
                     ? 'bg-white shadow-neo scale-100 z-10' 
                     : 'bg-gray-200 text-gray-500 shadow-none hover:bg-gray-100'}
                 `}
               >
-                 <Search size={24} strokeWidth={3} /> {t.latest}
+                 <Search className="w-4 h-4 md:w-6 md:h-6" strokeWidth={3} /> {t.latest}
               </button>
 
               {/* Rating Sort */}
               <button 
                 onClick={() => setSortBy('rating')}
-                className={`text-xl md:text-2xl font-black border-2 border-black px-4 py-2 flex items-center gap-2 transition-all duration-200
+                className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
                   ${sortBy === 'rating' 
                     ? 'bg-white shadow-neo scale-100 z-10' 
                     : 'bg-gray-200 text-gray-500 shadow-none hover:bg-gray-100'}
                 `}
               >
-                 <ArrowUpDown size={24} strokeWidth={3} /> {t.sortRating}
+                 <ArrowUpDown className="w-4 h-4 md:w-6 md:h-6" strokeWidth={3} /> {t.sortRating}
               </button>
            </div>
            
-           <div className="bg-banana-yellow border-2 border-black px-4 py-2 font-bold shadow-neo">
+           <div className="bg-banana-yellow border-2 border-black px-2 md:px-4 py-2 font-bold shadow-neo text-sm md:text-base">
               {t.total}: {isLoading ? '...' : sortedPrompts.length}
            </div>
         </div>
@@ -575,7 +575,7 @@ const App: React.FC = () => {
         ) : null}
 
         {/* Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-8">
             {sortedPrompts.map((prompt) => (
               <PromptCard 
                   key={prompt.id} 
