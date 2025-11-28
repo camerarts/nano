@@ -19,7 +19,7 @@ export interface User {
   isAdmin: boolean;
 }
 
-export type ModalType = 'LOGIN' | 'EDIT' | 'SUBMIT' | null;
+export type ModalType = 'LOGIN' | 'EDIT' | 'SUBMIT' | 'SUBMISSIONS' | null;
 
 export interface EditModalProps {
   prompt: Prompt;
