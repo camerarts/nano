@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye } from 'lucide-react';
+import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
@@ -41,14 +41,17 @@ const TEXT = {
     passError: "密码错误",
     confirm: "确认登陆",
     editTitle: "编辑提示词",
+    submitTitle: "提交提示词",
     lblTitle: "标题",
     lblImg: "图片链接",
     lblUpload: "或上传图片 (自动裁剪16:9)",
     lblContent: "提示词文本",
     lblDate: "上传日期 (精确到小时)",
     lblRating: "评级",
+    lblAuthor: "上传者信息",
     cancel: "取消",
     save: "保存修改",
+    submit: "提交提示词",
     preview: "预览",
     langName: "EN",
     paste: "粘贴",
@@ -56,6 +59,12 @@ const TEXT = {
     saving: "正在保存...",
     visitPrefix: "您是本网站第",
     visitSuffix: "位访客",
+    visitorSubmit: "提交提示词",
+    submitSuccess: "提交成功！您的提示词正在审核中。",
+    statusPending: "待审核",
+    approve: "批准 (公开)",
+    delete: "删除",
+    confirmDelete: "确定要删除这个提示词吗？此操作无法撤销。",
   },
   en: {
     subtitle: "PROMPT LIBRARY",
@@ -75,14 +84,17 @@ const TEXT = {
     passError: "Incorrect password",
     confirm: "Login",
     editTitle: "Edit Prompt",
+    submitTitle: "Submit Prompt",
     lblTitle: "Title",
     lblImg: "Image URL",
     lblUpload: "Or Upload Image (Auto-crop 16:9)",
     lblContent: "Prompt Content",
     lblDate: "Date (Hour precision)",
     lblRating: "Rating",
+    lblAuthor: "Uploader Info",
     cancel: "Cancel",
     save: "Save Changes",
+    submit: "Submit Prompt",
     preview: "PREVIEW",
     langName: "中",
     paste: "Paste",
@@ -90,6 +102,12 @@ const TEXT = {
     saving: "Saving...",
     visitPrefix: "You are visitor #",
     visitSuffix: "",
+    visitorSubmit: "Submit Prompt",
+    submitSuccess: "Submitted successfully! Your prompt is pending review.",
+    statusPending: "Pending Review",
+    approve: "Approve (Public)",
+    delete: "Delete",
+    confirmDelete: "Are you sure you want to delete this prompt? This cannot be undone.",
   }
 };
 
@@ -112,12 +130,14 @@ const App: React.FC = () => {
   const [sessionPassword, setSessionPassword] = useState(''); // Store verified password for API calls
   const [loginError, setLoginError] = useState('');
 
-  // Edit Modal State
+  // Edit/Submit Modal State
   const [editFormTitle, setEditFormTitle] = useState('');
   const [editFormContent, setEditFormContent] = useState('');
   const [editFormImage, setEditFormImage] = useState('');
   const [editFormDate, setEditFormDate] = useState('');
   const [editFormRating, setEditFormRating] = useState(0);
+  const [editFormAuthor, setEditFormAuthor] = useState('');
+  const [editFormStatus, setEditFormStatus] = useState<'approved' | 'pending' | 'rejected'>('approved');
 
   // Restore Session on Mount
   useEffect(() => {
@@ -157,10 +177,18 @@ const App: React.FC = () => {
   }, []);
 
   // Fetch Prompts from Cloudflare API
+  // Re-fetch when sessionPassword changes (to switch between Public/Admin views)
   useEffect(() => {
     const fetchPrompts = async () => {
+      setIsLoading(true);
       try {
-        const res = await fetch('/api/prompts');
+        // Pass session password in header to identify admin
+        const headers: Record<string, string> = {};
+        if (sessionPassword) {
+            headers['X-Admin-Pass'] = sessionPassword;
+        }
+
+        const res = await fetch('/api/prompts', { headers });
         if (res.ok) {
           const data = await res.json();
           setPrompts(data);
@@ -172,7 +200,7 @@ const App: React.FC = () => {
       }
     };
     fetchPrompts();
-  }, []);
+  }, [sessionPassword]);
 
   // Memoized Sorted Prompts
   const sortedPrompts = useMemo(() => {
@@ -286,9 +314,41 @@ const App: React.FC = () => {
     setEditFormContent(prompt.content);
     setEditFormImage(prompt.imageUrl || '');
     setEditFormRating(prompt.rating || 0);
+    setEditFormAuthor(prompt.author || '');
+    setEditFormStatus(prompt.status || 'approved');
     const formattedDate = prompt.date.length > 16 ? prompt.date.substring(0, 16) : prompt.date;
     setEditFormDate(formattedDate);
     setModalType('EDIT');
+  };
+
+  const handleDeletePrompt = async () => {
+      if (!editingPrompt || !user) return;
+      if (!window.confirm(t.confirmDelete)) return;
+
+      setIsSaving(true);
+      try {
+          const res = await fetch('/api/prompts', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                  id: editingPrompt.id, 
+                  authPassword: sessionPassword 
+              })
+          });
+
+          if (res.ok) {
+              setPrompts(prev => prev.filter(p => p.id !== editingPrompt.id));
+              setModalType(null);
+              setEditingPrompt(null);
+          } else {
+              alert("Delete failed");
+          }
+      } catch (e) {
+          console.error("Delete failed", e);
+          alert("Error deleting");
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   const handleSaveEdit = async () => {
@@ -302,6 +362,8 @@ const App: React.FC = () => {
       imageUrl: editFormImage,
       date: editFormDate,
       rating: editFormRating,
+      author: editFormAuthor,
+      status: editFormStatus,
       authPassword: sessionPassword // Send the verified session password
     };
 
@@ -326,10 +388,12 @@ const App: React.FC = () => {
         });
         
         // Refresh session timestamp on activity
-        localStorage.setItem(SESSION_KEY, JSON.stringify({
-          password: sessionPassword,
-          timestamp: Date.now()
-        }));
+        if (sessionPassword) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify({
+              password: sessionPassword,
+              timestamp: Date.now()
+            }));
+        }
 
         setModalType(null);
         setEditingPrompt(null);
@@ -350,6 +414,16 @@ const App: React.FC = () => {
   };
 
   const handleCreateNew = () => {
+    // Create new for Admin
+    initNewPrompt('EDIT');
+  };
+
+  const handlePublicSubmit = () => {
+    // Create new for Public
+    initNewPrompt('SUBMIT');
+  };
+
+  const initNewPrompt = (type: ModalType) => {
     const now = new Date();
     const localIso = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
 
@@ -357,17 +431,65 @@ const App: React.FC = () => {
         id: Date.now().toString(),
         title: lang === 'zh' ? "新提示词" : "New Prompt",
         content: lang === 'zh' ? DEFAULT_CONTENT.zh : DEFAULT_CONTENT.en,
-        author: user?.username || "Admin",
+        author: type === 'SUBMIT' ? (lang === 'zh' ? "匿名" : "Anonymous") : (user?.username || "Admin"),
         date: localIso,
         tags: ["New"],
         likes: 0,
-        imageUrl: '', // Empty by default
-        rating: 5
+        imageUrl: '', 
+        rating: 5,
+        status: type === 'SUBMIT' ? 'pending' : 'approved'
     };
     
-    // Just open modal, don't save to API yet
-    openEditModal(newPrompt);
+    setEditingPrompt(newPrompt);
+    setEditFormTitle(newPrompt.title);
+    setEditFormContent(newPrompt.content);
+    setEditFormImage('');
+    setEditFormRating(newPrompt.rating || 5);
+    setEditFormAuthor(newPrompt.author);
+    setEditFormDate(localIso);
+    setEditFormStatus(newPrompt.status || 'approved');
+    
+    setModalType(type);
   };
+
+  const handlePublicSubmitAction = async () => {
+      if (!editingPrompt) return;
+      setIsSaving(true);
+      
+      const submitData = {
+          ...editingPrompt,
+          title: editFormTitle,
+          content: editFormContent,
+          imageUrl: editFormImage,
+          date: editFormDate,
+          rating: editFormRating,
+          author: editFormAuthor,
+          // No password sent, backend will force 'pending' status
+      };
+
+      try {
+          const res = await fetch('/api/prompts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(submitData)
+          });
+          
+          if (res.ok) {
+              alert(t.submitSuccess);
+              setModalType(null);
+              setEditingPrompt(null);
+              // We don't update local prompts list because it's pending and user shouldn't see it yet
+          } else {
+              alert("Submission failed.");
+          }
+      } catch (e) {
+          console.error("Submission error", e);
+          alert("Error submitting.");
+      } finally {
+          setIsSaving(false);
+      }
+  };
+
 
   // Reusable Image Processing Logic (Crop to 16:9)
   const processImageFile = (file: File) => {
@@ -555,20 +677,34 @@ const App: React.FC = () => {
                  <span className="bg-black border-2 border-white px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-base shadow-neo-sm">{t.public}</span>
               </div>
               
-              {/* VISITOR COUNTER - Right aligned on mobile, Centered on desktop */}
-              {visitorCount !== null && (
-                <div className="flex items-center justify-end gap-1 md:gap-2 z-0 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 select-none shrink-0">
-                    <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
-                        {t.visitPrefix}
-                    </span>
-                    <span className="bg-black text-banana-yellow px-1.5 py-0.5 md:px-3 border md:border-2 border-white shadow-[2px_2px_0px_rgba(0,0,0,0.4)] md:shadow-[3px_3px_0px_rgba(0,0,0,0.4)] font-black text-xs md:text-2xl -rotate-2 mx-0.5 md:mx-2 inline-block font-mono">
-                        {visitorCount}
-                    </span>
-                    <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
-                        {t.visitSuffix}
-                    </span>
-                </div>
-              )}
+              <div className="flex items-center gap-4 z-10">
+                 {/* VISITOR COUNTER */}
+                 {visitorCount !== null && (
+                    <div className="flex items-center justify-end gap-1 md:gap-2 select-none shrink-0">
+                        <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
+                            {t.visitPrefix}
+                        </span>
+                        <span className="bg-black text-banana-yellow px-1.5 py-0.5 md:px-3 border md:border-2 border-white shadow-[2px_2px_0px_rgba(0,0,0,0.4)] md:shadow-[3px_3px_0px_rgba(0,0,0,0.4)] font-black text-xs md:text-2xl -rotate-2 mx-0.5 md:mx-2 inline-block font-mono">
+                            {visitorCount}
+                        </span>
+                        <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
+                            {t.visitSuffix}
+                        </span>
+                    </div>
+                 )}
+
+                 {/* PUBLIC SUBMIT BUTTON (Only if not logged in) */}
+                 {!user && (
+                    <NeoButton 
+                        variant="secondary" 
+                        size="sm" 
+                        onClick={handlePublicSubmit}
+                        className="!shadow-neo-sm font-bold text-[10px] md:text-sm animate-pulse hover:animate-none whitespace-nowrap"
+                    >
+                        {t.visitorSubmit}
+                    </NeoButton>
+                 )}
+              </div>
            </div>
         </div>
       </section>
@@ -663,11 +799,11 @@ const App: React.FC = () => {
          </div>
       </Modal>
 
-      {/* Edit Modal */}
+      {/* Edit / Submit Modal */}
       <Modal
-        isOpen={modalType === 'EDIT'}
+        isOpen={modalType === 'EDIT' || modalType === 'SUBMIT'}
         onClose={() => !isSaving && setModalType(null)}
-        title={t.editTitle}
+        title={modalType === 'SUBMIT' ? t.submitTitle : t.editTitle}
       >
          {/* Added onPaste handler to the container */}
          <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2 relative" onPaste={handleModalPaste}>
@@ -687,22 +823,34 @@ const App: React.FC = () => {
                />
             </div>
 
-            <div>
-               <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblRating}</label>
-               <div className="flex gap-1 border-2 border-black w-fit p-1 bg-white">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button 
-                      key={star} 
-                      onClick={() => setEditFormRating(star)}
-                      className="transition-transform hover:scale-110"
-                    >
-                       <Star 
-                         size={24} 
-                         className={star <= editFormRating ? "fill-banana-yellow text-black" : "text-gray-300"} 
-                       />
-                    </button>
-                  ))}
-               </div>
+            <div className="flex gap-4">
+                <div className="flex-1">
+                   <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblRating}</label>
+                   <div className="flex gap-1 border-2 border-black w-fit p-1 bg-white">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button 
+                          key={star} 
+                          onClick={() => setEditFormRating(star)}
+                          className="transition-transform hover:scale-110"
+                        >
+                           <Star 
+                             size={24} 
+                             className={star <= editFormRating ? "fill-banana-yellow text-black" : "text-gray-300"} 
+                           />
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
+                <div className="flex-1">
+                    <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblAuthor}</label>
+                    <input 
+                      type="text" 
+                      value={editFormAuthor} 
+                      onChange={(e) => setEditFormAuthor(e.target.value)}
+                      className="w-full border-2 border-black p-2 outline-none font-bold focus:shadow-neo-sm transition-shadow" 
+                    />
+                </div>
             </div>
 
             <div>
@@ -760,6 +908,32 @@ const App: React.FC = () => {
                />
             </div>
 
+            {/* Admin Only Fields */}
+            {modalType === 'EDIT' && user && (
+                <div className="bg-gray-50 p-2 border-2 border-black border-dashed flex items-center justify-between gap-2">
+                   
+                   <div className="flex items-center gap-2">
+                       <span className="font-bold text-xs uppercase bg-black text-white px-1">STATUS</span>
+                       <button 
+                         onClick={() => setEditFormStatus(s => s === 'approved' ? 'pending' : 'approved')}
+                         className={`flex items-center gap-1 px-2 py-1 border-2 border-black font-bold text-xs transition-colors ${editFormStatus === 'approved' ? 'bg-green-400 text-black' : 'bg-yellow-200 text-black'}`}
+                       >
+                           {editFormStatus === 'approved' ? <CheckCircle size={14}/> : <XCircle size={14}/>}
+                           {editFormStatus === 'approved' ? t.approve : t.statusPending}
+                       </button>
+                   </div>
+
+                   <button 
+                      onClick={handleDeletePrompt}
+                      className="bg-red-500 hover:bg-red-600 text-white border-2 border-black p-1 shadow-sm"
+                      title={t.delete}
+                   >
+                       <Trash2 size={16} />
+                   </button>
+                </div>
+            )}
+            
+            {/* Common Fields */}
             <div>
                <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblDate}</label>
                <input 
@@ -772,7 +946,11 @@ const App: React.FC = () => {
 
             <div className="flex justify-end gap-2 mt-4 pt-4 border-t-2 border-black border-dashed">
                <NeoButton variant="white" onClick={() => setModalType(null)} disabled={isSaving}>{t.cancel}</NeoButton>
-               <NeoButton variant="primary" onClick={handleSaveEdit} disabled={isSaving}>{t.save}</NeoButton>
+               {modalType === 'SUBMIT' ? (
+                   <NeoButton variant="secondary" onClick={handlePublicSubmitAction} disabled={isSaving}>{t.submit}</NeoButton>
+               ) : (
+                   <NeoButton variant="primary" onClick={handleSaveEdit} disabled={isSaving}>{t.save}</NeoButton>
+               )}
             </div>
          </div>
       </Modal>
