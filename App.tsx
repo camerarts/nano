@@ -540,25 +540,25 @@ const App: React.FC = () => {
                     <span className="bg-black text-white px-4 py-1 font-bold text-lg rotate-2 shadow-[2px_2px_0px_#fff]">{t.quality}</span>
                     <span className="bg-banana-yellow border-2 border-black px-4 py-1 font-bold text-lg -rotate-2 shadow-[2px_2px_0px_#000]">{t.curated}</span>
                  </div>
-
-                 {/* VISITOR COUNTER */}
-                 {visitorCount !== null && (
-                   <div className="flex items-center justify-center gap-2 font-mono text-sm md:text-base font-bold bg-black/5 p-2 rounded border border-black/10">
-                      <span className="text-black">{t.visitPrefix}</span>
-                      <span className="bg-neo-red text-white px-2 py-0.5 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                         {visitorCount}
-                      </span>
-                      <span className="text-black">{t.visitSuffix}</span>
-                   </div>
-                 )}
               </div>
            </div>
 
-           <div className="mt-8 flex justify-between items-center">
-              <div className="flex gap-2 text-white font-bold text-shadow-sm">
+           <div className="mt-8 relative flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex gap-2 text-white font-bold text-shadow-sm z-10 w-full md:w-auto justify-center md:justify-start">
                  <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.ver}</span>
                  <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.public}</span>
               </div>
+              
+              {/* VISITOR COUNTER - CENTERED */}
+              {visitorCount !== null && (
+                <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 flex items-center gap-2 font-mono text-sm md:text-base font-bold text-white text-shadow-sm z-0">
+                    <span>{t.visitPrefix}</span>
+                    <span className="bg-banana-yellow text-black px-2 py-0.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                        {visitorCount}
+                    </span>
+                    <span>{t.visitSuffix}</span>
+                </div>
+              )}
            </div>
         </div>
       </section>
