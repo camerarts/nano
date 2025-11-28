@@ -552,12 +552,16 @@ const App: React.FC = () => {
               
               {/* VISITOR COUNTER - CENTERED */}
               {visitorCount !== null && (
-                <div className="md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 flex items-center gap-2 font-mono text-sm md:text-base font-bold text-white text-shadow-sm z-0">
-                    <span>{t.visitPrefix}</span>
-                    <span className="bg-banana-yellow text-black px-2 py-0.5 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex items-center justify-center gap-1 md:gap-2 z-0 mx-auto mt-4 md:mt-0 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 select-none">
+                    <span className="text-white font-black italic tracking-wider drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-xs md:text-base lg:text-lg">
+                        {t.visitPrefix}
+                    </span>
+                    <span className="bg-black text-banana-yellow px-3 py-0.5 border-2 border-white shadow-[3px_3px_0px_rgba(0,0,0,0.4)] font-black text-lg md:text-2xl -rotate-2 mx-1 md:mx-2 inline-block font-mono">
                         {visitorCount}
                     </span>
-                    <span>{t.visitSuffix}</span>
+                    <span className="text-white font-black italic tracking-wider drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-xs md:text-base lg:text-lg">
+                        {t.visitSuffix}
+                    </span>
                 </div>
               )}
            </div>
