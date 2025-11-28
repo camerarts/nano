@@ -10,6 +10,7 @@ export interface Prompt {
   imageUrl?: string;
   isOfficial?: boolean;
   rating?: number; // 1-5
+  status?: 'approved' | 'pending' | 'rejected';
 }
 
 export interface User {
@@ -18,7 +19,7 @@ export interface User {
   isAdmin: boolean;
 }
 
-export type ModalType = 'LOGIN' | 'EDIT' | null;
+export type ModalType = 'LOGIN' | 'EDIT' | 'SUBMIT' | null;
 
 export interface EditModalProps {
   prompt: Prompt;
