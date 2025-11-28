@@ -469,7 +469,11 @@ const App: React.FC = () => {
       {/* --- HEADER --- */}
       <header className="bg-neo-red border-b-4 border-black sticky top-0 z-40">
         <div className="container mx-auto px-4 h-20 flex items-center justify-between">
-          <div className="flex flex-col select-none group cursor-pointer">
+          <div 
+             className="flex flex-col select-none group cursor-pointer"
+             onClick={() => window.location.reload()}
+             title="Refresh Page"
+          >
              <h1 className="text-3xl md:text-4xl font-black text-white drop-shadow-[3px_3px_0px_rgba(0,0,0,1)] tracking-tighter italic group-hover:-translate-y-1 transition-transform">
                NANO BANANA PRO
              </h1>
