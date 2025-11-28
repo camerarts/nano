@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Prompt } from '../types';
-import { Heart, Copy, Edit2, CornerDownRight, Star } from 'lucide-react';
+import { Heart, Copy, Edit2, CornerDownRight, Star, Clock } from 'lucide-react';
 import { NeoButton } from './ui/NeoButton';
 
 interface PromptCardProps {
@@ -23,7 +23,8 @@ const LABELS = {
     hoursAgo: "小时前",
     daysAgo: "天前",
     monthsAgo: "个月前",
-    yearsAgo: "年前"
+    yearsAgo: "年前",
+    pending: "待审核",
   },
   en: {
     official: "OFFICIAL",
@@ -34,7 +35,8 @@ const LABELS = {
     hoursAgo: "hours ago",
     daysAgo: "days ago",
     monthsAgo: "months ago",
-    yearsAgo: "years ago"
+    yearsAgo: "years ago",
+    pending: "PENDING",
   }
 };
 
@@ -82,9 +84,10 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
   };
 
   const rating = prompt.rating || 0;
+  const isPending = prompt.status === 'pending';
 
   return (
-    <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative group">
+    <div className={`bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative group ${isPending ? 'opacity-75 bg-gray-50 border-dashed' : ''}`}>
       
       {/* Header / Meta */}
       <div className="p-2 md:p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-10 md:h-16">
@@ -99,8 +102,15 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
         </div>
         
         <div className="flex items-center gap-2 md:gap-3">
+          {/* Pending Status Badge (Visible if Admin can see it) */}
+          {isPending && (
+             <span className="bg-yellow-300 text-black text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold flex items-center gap-1">
+                <Clock size={10} /> {t.pending}
+             </span>
+          )}
+
           {/* Rating Sticker - Responsive Size */}
-          {rating > 0 && (
+          {rating > 0 && !isPending && (
             <div className="flex items-center gap-0.5 md:gap-1 bg-banana-yellow border-2 border-black px-1 py-0.5 md:px-2 md:py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] md:shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] mr-1 md:mr-2 select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
               {[...Array(5)].map((_, i) => (
                 <Star 
