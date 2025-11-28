@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown } from 'lucide-react';
+import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
@@ -54,6 +54,8 @@ const TEXT = {
     paste: "粘贴",
     loading: "加载数据中...",
     saving: "正在保存...",
+    visitPrefix: "您是本网站第",
+    visitSuffix: "位访客",
   },
   en: {
     subtitle: "PROMPT LIBRARY",
@@ -86,6 +88,8 @@ const TEXT = {
     paste: "Paste",
     loading: "Loading data...",
     saving: "Saving...",
+    visitPrefix: "You are visitor #",
+    visitSuffix: "",
   }
 };
 
@@ -99,6 +103,7 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'rating'>('date');
+  const [visitorCount, setVisitorCount] = useState<number | null>(null);
   
   const t = TEXT[lang];
 
@@ -132,6 +137,23 @@ const App: React.FC = () => {
         localStorage.removeItem(SESSION_KEY);
       }
     }
+  }, []);
+
+  // Record Visit and Fetch Count
+  useEffect(() => {
+    const recordVisit = async () => {
+      try {
+        const res = await fetch('/api/visit');
+        if (res.ok) {
+          const data = await res.json();
+          setVisitorCount(data.count);
+        }
+      } catch (e) {
+        console.error("Failed to record visit", e);
+      }
+    };
+    // We only want to run this once on mount
+    recordVisit();
   }, []);
 
   // Fetch Prompts from Cloudflare API
@@ -514,10 +536,21 @@ const App: React.FC = () => {
                  <h1 className="text-5xl md:text-8xl lg:text-9xl font-black italic text-black tracking-tighter leading-none mb-6 drop-shadow-[5px_5px_0px_rgba(255,255,255,1)] select-none scale-y-105">
                    {t.heroTitle}
                  </h1>
-                 <div className="flex gap-4 items-center flex-wrap justify-center">
+                 <div className="flex gap-4 items-center flex-wrap justify-center mb-6">
                     <span className="bg-black text-white px-4 py-1 font-bold text-lg rotate-2 shadow-[2px_2px_0px_#fff]">{t.quality}</span>
                     <span className="bg-banana-yellow border-2 border-black px-4 py-1 font-bold text-lg -rotate-2 shadow-[2px_2px_0px_#000]">{t.curated}</span>
                  </div>
+
+                 {/* VISITOR COUNTER */}
+                 {visitorCount !== null && (
+                   <div className="flex items-center justify-center gap-2 font-mono text-sm md:text-base font-bold bg-black/5 p-2 rounded border border-black/10">
+                      <span className="text-black">{t.visitPrefix}</span>
+                      <span className="bg-neo-red text-white px-2 py-0.5 border border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                         {visitorCount}
+                      </span>
+                      <span className="text-black">{t.visitSuffix}</span>
+                   </div>
+                 )}
               </div>
            </div>
 
