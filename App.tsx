@@ -544,22 +544,23 @@ const App: React.FC = () => {
               </div>
            </div>
 
-           <div className="mt-8 relative flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="flex gap-2 text-white font-bold text-shadow-sm z-10 w-full md:w-auto justify-center md:justify-start">
-                 <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.ver}</span>
-                 <span className="bg-black border-2 border-white px-3 py-1 shadow-neo-sm">{t.public}</span>
+           {/* Hero Footer Info Row - Responsive Single Line */}
+           <div className="mt-6 md:mt-8 relative flex flex-row items-center justify-between w-full">
+              <div className="flex gap-2 text-white font-bold text-shadow-sm z-10 md:w-auto shrink-0">
+                 <span className="bg-black border-2 border-white px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-base shadow-neo-sm">{t.ver}</span>
+                 <span className="bg-black border-2 border-white px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-base shadow-neo-sm">{t.public}</span>
               </div>
               
-              {/* VISITOR COUNTER - CENTERED */}
+              {/* VISITOR COUNTER - Right aligned on mobile, Centered on desktop */}
               {visitorCount !== null && (
-                <div className="flex items-center justify-center gap-1 md:gap-2 z-0 mx-auto mt-4 md:mt-0 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 select-none">
-                    <span className="text-white font-black italic tracking-wider drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-xs md:text-base lg:text-lg">
+                <div className="flex items-center justify-end gap-1 md:gap-2 z-0 md:absolute md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 select-none shrink-0">
+                    <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
                         {t.visitPrefix}
                     </span>
-                    <span className="bg-black text-banana-yellow px-3 py-0.5 border-2 border-white shadow-[3px_3px_0px_rgba(0,0,0,0.4)] font-black text-lg md:text-2xl -rotate-2 mx-1 md:mx-2 inline-block font-mono">
+                    <span className="bg-black text-banana-yellow px-1.5 py-0.5 md:px-3 border md:border-2 border-white shadow-[2px_2px_0px_rgba(0,0,0,0.4)] md:shadow-[3px_3px_0px_rgba(0,0,0,0.4)] font-black text-xs md:text-2xl -rotate-2 mx-0.5 md:mx-2 inline-block font-mono">
                         {visitorCount}
                     </span>
-                    <span className="text-white font-black italic tracking-wider drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-xs md:text-base lg:text-lg">
+                    <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
                         {t.visitSuffix}
                     </span>
                 </div>
