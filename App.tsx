@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle, Inbox, Bell } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
@@ -65,6 +65,10 @@ const TEXT = {
     approve: "批准 (公开)",
     delete: "删除",
     confirmDelete: "确定要删除这个提示词吗？此操作无法撤销。",
+    userSubmissions: "用户提交提示词",
+    noSubmissions: "暂无待审核的提交。",
+    review: "审核",
+    submissionsTitle: "待审核列表",
   },
   en: {
     subtitle: "PROMPT LIBRARY",
@@ -108,6 +112,10 @@ const TEXT = {
     approve: "Approve (Public)",
     delete: "Delete",
     confirmDelete: "Are you sure you want to delete this prompt? This cannot be undone.",
+    userSubmissions: "User Submissions",
+    noSubmissions: "No pending submissions.",
+    review: "Review",
+    submissionsTitle: "Pending Submissions",
   }
 };
 
@@ -201,6 +209,10 @@ const App: React.FC = () => {
     };
     fetchPrompts();
   }, [sessionPassword]);
+
+  // Derived State
+  const pendingPrompts = useMemo(() => prompts.filter(p => p.status === 'pending'), [prompts]);
+  const pendingCount = pendingPrompts.length;
 
   // Memoized Sorted Prompts
   const sortedPrompts = useMemo(() => {
@@ -321,8 +333,9 @@ const App: React.FC = () => {
     setModalType('EDIT');
   };
 
-  const handleDeletePrompt = async () => {
-      if (!editingPrompt || !user) return;
+  const handleDeletePrompt = async (targetId?: string) => {
+      const idToDelete = targetId || editingPrompt?.id;
+      if (!idToDelete || !user) return;
       if (!window.confirm(t.confirmDelete)) return;
 
       setIsSaving(true);
@@ -331,15 +344,18 @@ const App: React.FC = () => {
               method: 'DELETE',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ 
-                  id: editingPrompt.id, 
+                  id: idToDelete, 
                   authPassword: sessionPassword 
               })
           });
 
           if (res.ok) {
-              setPrompts(prev => prev.filter(p => p.id !== editingPrompt.id));
-              setModalType(null);
-              setEditingPrompt(null);
+              setPrompts(prev => prev.filter(p => p.id !== idToDelete));
+              // Close modals if open
+              if (modalType === 'EDIT' && editingPrompt?.id === idToDelete) {
+                  setModalType(null);
+                  setEditingPrompt(null);
+              }
           } else {
               alert("Delete failed");
           }
@@ -612,14 +628,37 @@ const App: React.FC = () => {
                  </NeoButton>
             )}
 
-            <NeoButton 
-                variant="white" 
-                size="sm" 
-                onClick={() => setLang(l => l === 'zh' ? 'en' : 'zh')} 
-                className="!px-3 !shadow-neo-sm font-bold flex items-center gap-2"
-            >
-                <Languages size={18} /> {t.langName}
-            </NeoButton>
+            <div className="flex items-center gap-2">
+                <NeoButton 
+                    variant="white" 
+                    size="sm" 
+                    onClick={() => setLang(l => l === 'zh' ? 'en' : 'zh')} 
+                    className="!px-3 !shadow-neo-sm font-bold flex items-center gap-2"
+                >
+                    <Languages size={18} /> {t.langName}
+                </NeoButton>
+
+                {/* USER SUBMISSIONS BUTTON (Admin Only) */}
+                {user && (
+                  <div className="relative">
+                    <NeoButton 
+                        variant="white" 
+                        size="sm" 
+                        onClick={() => setModalType('SUBMISSIONS')}
+                        className="!px-3 !shadow-neo-sm font-bold flex items-center gap-2"
+                        title={t.userSubmissions}
+                    >
+                        <Inbox size={18} /> 
+                        <span className="hidden lg:inline">{t.userSubmissions}</span>
+                    </NeoButton>
+                    {pendingCount > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[10px] font-bold rounded-md px-1.5 py-0.5 border-2 border-white shadow-sm z-10 min-w-[20px] text-center">
+                            {pendingCount}
+                        </span>
+                    )}
+                  </div>
+                )}
+            </div>
 
             {user ? (
               <div className="flex items-center gap-3 bg-white px-3 py-1 border-2 border-black shadow-neo">
@@ -799,6 +838,54 @@ const App: React.FC = () => {
          </div>
       </Modal>
 
+      {/* SUBMISSIONS LIST MODAL */}
+      <Modal
+        isOpen={modalType === 'SUBMISSIONS'}
+        onClose={() => setModalType(null)}
+        title={t.submissionsTitle}
+      >
+        <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2">
+            {pendingCount === 0 ? (
+                <div className="text-center py-10 text-gray-500 font-bold">
+                    <CheckCircle size={48} className="mx-auto mb-2 text-green-500 opacity-50"/>
+                    {t.noSubmissions}
+                </div>
+            ) : (
+                <div className="flex flex-col gap-3">
+                    {pendingPrompts.map(prompt => (
+                        <div key={prompt.id} className="bg-white border-2 border-black p-3 shadow-neo-sm flex gap-3 items-start">
+                             <div className="w-20 h-20 border border-black bg-gray-100 shrink-0">
+                                {prompt.imageUrl ? (
+                                    <img src={prompt.imageUrl} alt="" className="w-full h-full object-cover"/>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-300"><ImageIcon size={16}/></div>
+                                )}
+                             </div>
+                             <div className="flex-1 min-w-0">
+                                 <h4 className="font-bold text-sm truncate mb-1">{prompt.title}</h4>
+                                 <div className="text-xs text-gray-600 mb-2">@{prompt.author} • {prompt.date.substring(5,16)}</div>
+                                 <div className="flex gap-2">
+                                     <button 
+                                        onClick={() => openEditModal(prompt)}
+                                        className="bg-banana-yellow border border-black px-2 py-1 text-xs font-bold hover:bg-yellow-400 flex items-center gap-1"
+                                     >
+                                         <Eye size={12}/> {t.review}
+                                     </button>
+                                     <button 
+                                        onClick={() => handleDeletePrompt(prompt.id)}
+                                        className="bg-red-500 text-white border border-black px-2 py-1 text-xs font-bold hover:bg-red-600 flex items-center gap-1"
+                                     >
+                                         <Trash2 size={12}/> {t.delete}
+                                     </button>
+                                 </div>
+                             </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+      </Modal>
+
       {/* Edit / Submit Modal */}
       <Modal
         isOpen={modalType === 'EDIT' || modalType === 'SUBMIT'}
@@ -924,7 +1011,7 @@ const App: React.FC = () => {
                    </div>
 
                    <button 
-                      onClick={handleDeletePrompt}
+                      onClick={() => handleDeletePrompt()}
                       className="bg-red-500 hover:bg-red-600 text-white border-2 border-black p-1 shadow-sm"
                       title={t.delete}
                    >
