@@ -84,29 +84,28 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
   const rating = prompt.rating || 0;
 
   return (
-    <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative">
+    <div className="bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative group">
       
       {/* Header / Meta */}
-      <div className="p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-16">
+      <div className="p-2 md:p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-10 md:h-16">
         <div className="flex items-center gap-2">
            {/* Date with tooltip */}
            <span 
-             className="text-xs font-bold text-gray-600 cursor-help" 
+             className="text-[10px] md:text-xs font-bold text-gray-600 cursor-help" 
              title={getFullDate(prompt.date)}
            >
              {getRelativeTime(prompt.date)}
            </span>
         </div>
         
-        <div className="flex items-center gap-3">
-          {/* Rating Sticker - Bigger and Bolder */}
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Rating Sticker - Responsive Size */}
           {rating > 0 && (
-            <div className="flex items-center gap-1 bg-banana-yellow border-2 border-black px-2 py-1.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] mr-2 select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
+            <div className="flex items-center gap-0.5 md:gap-1 bg-banana-yellow border-2 border-black px-1 py-0.5 md:px-2 md:py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] md:shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] mr-1 md:mr-2 select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
-                  size={16} 
-                  className={i < rating ? "fill-black text-black" : "fill-transparent text-black/20"} 
+                  className={`w-2.5 h-2.5 md:w-4 md:h-4 ${i < rating ? "fill-black text-black" : "fill-transparent text-black/20"}`}
                   strokeWidth={2.5}
                 />
               ))}
@@ -114,7 +113,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
           )}
 
           {prompt.isOfficial && (
-            <span className="bg-neo-red text-white text-[10px] px-2 py-0.5 border-2 border-black font-bold rotate-[2deg] shadow-[2px_2px_0px_rgba(0,0,0,1)] select-none">
+            <span className="bg-neo-red text-white text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold rotate-[2deg] shadow-[1px_1px_0px_rgba(0,0,0,1)] md:shadow-[2px_2px_0px_rgba(0,0,0,1)] select-none">
               {t.official}
             </span>
           )}
@@ -122,8 +121,8 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
       </div>
 
       {/* Image / Content Area */}
-      <div className="p-4 flex-grow flex flex-col gap-4">
-        <h3 className="font-bold text-xl leading-tight">{prompt.title}</h3>
+      <div className="p-2 md:p-4 flex-grow flex flex-col gap-2 md:gap-4">
+        <h3 className="font-bold text-xs md:text-xl leading-tight line-clamp-2 md:line-clamp-none">{prompt.title}</h3>
         
         {prompt.imageUrl && (
           <div 
@@ -141,35 +140,35 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
         )}
 
         {/* The Prompt Box */}
-        <div className="relative bg-gray-100 border-2 border-black p-3 text-sm font-mono mt-auto shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
-           <CornerDownRight className="absolute top-2 left-2 w-4 h-4 text-gray-400" />
-           <p className="pl-6 pt-1 line-clamp-4 text-gray-700">
+        <div className="relative bg-gray-100 border-2 border-black p-2 md:p-3 text-xs md:text-sm font-mono mt-auto shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
+           <CornerDownRight className="absolute top-1.5 left-1.5 w-3 h-3 md:top-2 md:left-2 md:w-4 md:h-4 text-gray-400" />
+           <p className="pl-4 md:pl-6 pt-0.5 line-clamp-1 md:line-clamp-4 text-gray-700">
              {prompt.content}
            </p>
         </div>
       </div>
 
       {/* Footer Actions */}
-      <div className="p-3 border-t-2 border-black bg-white flex justify-between items-center gap-2">
-         <NeoButton variant="dark" size="sm" onClick={handleCopy} className="flex items-center gap-1 flex-1 justify-center">
-            {copied ? t.copied : <><Copy size={14} /> {t.copy}</>}
+      <div className="p-2 md:p-3 border-t-2 border-black bg-white flex justify-between items-center gap-2">
+         <NeoButton variant="dark" size="sm" onClick={handleCopy} className="flex items-center gap-1 flex-1 justify-center text-[10px] md:text-sm px-1 py-1 h-8 md:h-auto">
+            {copied ? t.copied : <><Copy className="w-3 h-3 md:w-4 md:h-4" /> {t.copy}</>}
          </NeoButton>
          
          <div className="flex gap-2">
             <button 
                 onClick={() => onLike(prompt.id)}
-                className="p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-white flex items-center gap-1 text-xs font-bold active:bg-red-50 group"
+                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-white flex items-center gap-1 text-[10px] md:text-xs font-bold active:bg-red-50 group h-8 md:h-auto min-w-[36px] md:min-w-[44px] justify-center"
             >
-               <Heart size={14} className={`transition-transform group-hover:scale-110 ${prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"}`} />
+               <Heart className={`w-3 h-3 md:w-4 md:h-4 transition-transform group-hover:scale-110 ${prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"}`} />
                {prompt.likes}
             </button>
             
             {canEdit && (
               <button 
                 onClick={() => onEdit(prompt)}
-                className="p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-banana-yellow"
+                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-banana-yellow h-8 md:h-auto min-w-[30px] md:min-w-[40px] flex items-center justify-center"
               >
-                <Edit2 size={14} />
+                <Edit2 className="w-3 h-3 md:w-4 md:h-4" />
               </button>
             )}
          </div>
