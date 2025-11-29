@@ -1,188 +1,223 @@
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import { Upload, X, Move, ZoomIn } from 'lucide-react';
 
-import React from 'react';
-import { Prompt } from '../types';
-import { Heart, Copy, Edit2, CornerDownRight, Star, Clock } from 'lucide-react';
-import { NeoButton } from './ui/NeoButton';
-
-interface PromptCardProps {
-  prompt: Prompt;
-  canEdit: boolean;
-  onEdit: (prompt: Prompt) => void;
-  onLike: (id: string) => void;
-  onImageClick?: (url: string) => void;
-  lang: 'zh' | 'en';
+interface ImageCropperProps {
+  label: string;
+  onImageChange?: (hasImage: boolean) => void;
+  isActive?: boolean;
+  onClick?: () => void;
 }
 
-const LABELS = {
-  zh: {
-    official: "官方",
-    copy: "复制",
-    copied: "已复制!",
-    justNow: "刚刚",
-    minsAgo: "分钟前",
-    hoursAgo: "小时前",
-    daysAgo: "天前",
-    monthsAgo: "个月前",
-    yearsAgo: "年前",
-    pending: "待审核",
-  },
-  en: {
-    official: "OFFICIAL",
-    copy: "COPY",
-    copied: "COPIED!",
-    justNow: "Just now",
-    minsAgo: "mins ago",
-    hoursAgo: "hours ago",
-    daysAgo: "days ago",
-    monthsAgo: "months ago",
-    yearsAgo: "years ago",
-    pending: "PENDING",
-  }
-};
+export interface ImageCropperRef {
+  getResult: () => Promise<string | null>;
+  setImage: (dataUrl: string) => void;
+}
 
-export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit, onLike, onImageClick, lang }) => {
-  const [copied, setCopied] = React.useState(false);
-  const t = LABELS[lang];
+export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ label, onImageChange, isActive, onClick }, ref) => {
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(prompt.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Internal canvas resolution (8:9 vertical for split view)
+  const CANVAS_WIDTH = 640;
+  const CANVAS_HEIGHT = 720;
+
+  useImperativeHandle(ref, () => ({
+    getResult: async () => {
+      if (!imageSrc || !imgRef.current) return null;
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = CANVAS_WIDTH;
+      canvas.height = CANVAS_HEIGHT;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      // Fill background
+      ctx.fillStyle = '#f3f4f6';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+      const img = imgRef.current;
+      
+      // Calculate draw dimensions
+      const imgRatio = img.naturalWidth / img.naturalHeight;
+      const canvasRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
+      
+      ctx.save();
+      // Move to center of canvas
+      ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      // Apply user transform
+      ctx.translate(position.x, position.y);
+      ctx.scale(scale, scale);
+      
+      let baseW, baseH;
+      if (imgRatio > canvasRatio) {
+        // Image is wider, fit height
+        baseH = CANVAS_HEIGHT;
+        baseW = baseH * imgRatio;
+      } else {
+        // Image is taller, fit width
+        baseW = CANVAS_WIDTH;
+        baseH = baseW / imgRatio;
+      }
+      
+      ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
+      ctx.restore();
+
+      return canvas.toDataURL('image/jpeg', 0.9);
+    },
+    setImage: (dataUrl: string) => {
+        handleNewImage(dataUrl);
+    }
+  }));
+
+  const handleNewImage = (src: string) => {
+      setImageSrc(src);
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+      if (onImageChange) onImageChange(true);
   };
 
-  // Helper to format full date for tooltip
-  const getFullDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US');
-    } catch {
-      return dateStr;
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => handleNewImage(evt.target?.result as string);
+      reader.readAsDataURL(file);
     }
   };
 
-  // Helper for relative time
-  const getRelativeTime = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffSec = Math.floor(diffMs / 1000);
-      const diffMin = Math.floor(diffSec / 60);
-      const diffHour = Math.floor(diffMin / 60);
-      const diffDay = Math.floor(diffHour / 24);
-      const diffMonth = Math.floor(diffDay / 30);
-      const diffYear = Math.floor(diffDay / 365);
+  // --- Interaction Handlers ---
 
-      if (diffSec < 60) return t.justNow;
-      if (diffMin < 60) return `${diffMin} ${t.minsAgo}`;
-      if (diffHour < 24) return `${diffHour} ${t.hoursAgo}`;
-      if (diffDay < 30) return `${diffDay} ${t.daysAgo}`;
-      if (diffMonth < 12) return `${diffMonth} ${t.monthsAgo}`;
-      return `${diffYear} ${t.yearsAgo}`;
-    } catch (e) {
-      return dateStr;
-    }
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (onClick) onClick(); // Activate on interaction
+    if (!imageSrc) return;
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
   };
 
-  const rating = prompt.rating || 0;
-  const isPending = prompt.status === 'pending';
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const bounds = containerRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    
+    // Scale factor: canvasWidth / renderedWidth
+    const ratio = CANVAS_WIDTH / bounds.width;
+    
+    const dx = e.movementX;
+    const dy = e.movementY;
+    
+    setPosition(prev => ({
+        x: prev.x + (dx * ratio),
+        y: prev.y + (dy * ratio)
+    }));
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!imageSrc) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const zoomSpeed = 0.001;
+    const newScale = Math.min(Math.max(0.5, scale - e.deltaY * zoomSpeed), 5);
+    setScale(newScale);
+  };
+
+  const getRenderStyle = () => {
+      if (!containerRef.current) return {};
+      const bounds = containerRef.current.getBoundingClientRect();
+      const ratio = bounds.width / CANVAS_WIDTH; 
+      
+      return {
+          transform: `translate(-50%, -50%) translate(${position.x * ratio}px, ${position.y * ratio}px) scale(${scale})`,
+          left: '50%',
+          top: '50%',
+          position: 'absolute' as 'absolute',
+          minWidth: '100%',
+          minHeight: '100%',
+          objectFit: 'cover' as 'cover',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: 'none' as 'none',
+      };
+  };
+
+  const [renderTrigger, setRenderTrigger] = useState(0);
+  useEffect(() => {
+      const handleResize = () => setRenderTrigger(prev => prev + 1);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   return (
-    <div className={`bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative group ${isPending ? 'opacity-75 bg-gray-50 border-dashed' : ''}`}>
-      
-      {/* Header / Meta */}
-      <div className="p-2 md:p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-10 md:h-16">
-        <div className="flex items-center gap-2">
-           {/* Date with tooltip */}
-           <span 
-             className="text-[10px] md:text-xs font-bold text-gray-600 cursor-help" 
-             title={getFullDate(prompt.date)}
-           >
-             {getRelativeTime(prompt.date)}
-           </span>
-        </div>
-        
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* Pending Status Badge (Visible if Admin can see it) */}
-          {isPending && (
-             <span className="bg-yellow-300 text-black text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold flex items-center gap-1">
-                <Clock size={10} /> {t.pending}
-             </span>
-          )}
-
-          {/* Rating Sticker - Responsive Size */}
-          {rating > 0 && !isPending && (
-            <div className="flex items-center gap-0.5 md:gap-1 bg-banana-yellow border-2 border-black px-1 py-0.5 md:px-2 md:py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] md:shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] mr-1 md:mr-2 select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
-              {[...Array(5)].map((_, i) => (
-                <Star 
-                  key={i} 
-                  className={`w-2.5 h-2.5 md:w-4 md:h-4 ${i < rating ? "fill-black text-black" : "fill-transparent text-black/20"}`}
-                  strokeWidth={2.5}
-                />
-              ))}
-            </div>
-          )}
-
-          {prompt.isOfficial && (
-            <span className="bg-neo-red text-white text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold rotate-[2deg] shadow-[1px_1px_0px_rgba(0,0,0,1)] md:shadow-[2px_2px_0px_rgba(0,0,0,1)] select-none">
-              {t.official}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Image / Content Area */}
-      <div className="p-2 md:p-4 flex-grow flex flex-col gap-2 md:gap-4">
-        <h3 className="font-bold text-xs md:text-xl leading-tight line-clamp-2 md:line-clamp-none">{prompt.title}</h3>
-        
-        {prompt.imageUrl && (
-          <div 
-            className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group cursor-zoom-in shadow-sm"
-            onClick={() => onImageClick && onImageClick(prompt.imageUrl!)}
-          >
-             <img 
-               src={prompt.imageUrl} 
-               alt={prompt.title} 
-               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-             />
-             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
-             </div>
-          </div>
-        )}
-
-        {/* The Prompt Box */}
-        <div className="relative bg-gray-100 border-2 border-black p-2 md:p-3 text-xs md:text-sm font-mono mt-auto shadow-[2px_2px_0px_rgba(0,0,0,0.1)]">
-           <CornerDownRight className="absolute top-1.5 left-1.5 w-3 h-3 md:top-2 md:left-2 md:w-4 md:h-4 text-gray-400" />
-           <p className="pl-4 md:pl-6 pt-0.5 line-clamp-1 md:line-clamp-4 text-gray-700">
-             {prompt.content}
-           </p>
-        </div>
-      </div>
-
-      {/* Footer Actions */}
-      <div className="p-2 md:p-3 border-t-2 border-black bg-white flex justify-between items-center gap-2">
-         <NeoButton variant="dark" size="sm" onClick={handleCopy} className="flex items-center gap-1 flex-1 justify-center text-[10px] md:text-sm px-1 py-1 h-8 md:h-auto">
-            {copied ? t.copied : <><Copy className="w-3 h-3 md:w-4 md:h-4" /> {t.copy}</>}
-         </NeoButton>
-         
-         <div className="flex gap-2">
-            <button 
-                onClick={() => onLike(prompt.id)}
-                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-white flex items-center gap-1 text-[10px] md:text-xs font-bold active:bg-red-50 group h-8 md:h-auto min-w-[36px] md:min-w-[44px] justify-center"
-            >
-               <Heart className={`w-3 h-3 md:w-4 md:h-4 transition-transform group-hover:scale-110 ${prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"}`} />
-               {prompt.likes}
-            </button>
-            
-            {canEdit && (
-              <button 
-                onClick={() => onEdit(prompt)}
-                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-banana-yellow h-8 md:h-auto min-w-[30px] md:min-w-[40px] flex items-center justify-center"
-              >
-                <Edit2 className="w-3 h-3 md:w-4 md:h-4" />
-              </button>
+    <div className="flex flex-col gap-1 w-full group/cropper">
+        <div 
+            className={`flex justify-between items-center px-2 py-1 cursor-pointer transition-colors select-none ${isActive ? 'bg-green-400 text-black shadow-neo-sm' : 'hover:bg-gray-100'}`}
+            onClick={(e) => { e.stopPropagation(); if(onClick) onClick(); }}
+        >
+            <span className={`text-[10px] font-bold uppercase ${isActive ? 'text-black' : 'text-gray-500'}`}>{label}</span>
+            {imageSrc && (
+                <button 
+                  onClick={(e) => { e.stopPropagation(); setImageSrc(null); if (onImageChange) onImageChange(false); }}
+                  className="text-xs flex items-center gap-1 text-red-500 hover:text-white hover:bg-red-500 px-1 rounded"
+                >
+                    <X size={12}/>
+                </button>
             )}
-         </div>
-      </div>
+        </div>
+
+        <div 
+            ref={containerRef}
+            tabIndex={0}
+            className={`w-full aspect-[8/9] border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            onClick={(e) => { 
+                if(onClick) onClick();
+                if(!imageSrc) fileInputRef.current?.click();
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
+        >
+            <input 
+                ref={fileInputRef}
+                type="file" 
+                accept="image/*" 
+                onChange={handleUpload} 
+                className="hidden" 
+            />
+
+            {!imageSrc ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 pointer-events-none">
+                    <Upload size={24} className={`mb-2 ${isActive ? 'text-green-500' : ''}`}/>
+                    <span className={`text-xs font-bold ${isActive ? 'text-green-600' : ''}`}>Click to Upload</span>
+                    <span className="text-[10px]">or Paste (Ctrl+V)</span>
+                </div>
+            ) : (
+                <>
+                    <img 
+                        ref={imgRef}
+                        src={imageSrc} 
+                        alt="Crop Preview" 
+                        draggable={false}
+                        style={getRenderStyle()}
+                    />
+                    
+                    {/* Overlay Hints */}
+                    <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/cropper:opacity-100 transition-opacity pointer-events-none flex gap-2">
+                         <span className="flex items-center gap-1"><Move size={10}/> Drag</span>
+                         <span className="flex items-center gap-1"><ZoomIn size={10}/> Scroll</span>
+                    </div>
+                </>
+            )}
+        </div>
     </div>
   );
-};
+});
