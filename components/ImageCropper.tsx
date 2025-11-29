@@ -147,30 +147,9 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
     // But the movement on screen needs to feel 1:1.
     // So deltaScreen * ratio = deltaCanvas
     
-    // Wait, if we use CSS transform on the element, we should stick to screen logic? 
-    // No, to ensure getResult is accurate, let's store state in "Canvas Units" (1280x720 base).
-    // And apply CSS transform by dividing by ratio.
-    
-    // SIMPLIFIED: Store position in Screen Pixels? No, that breaks on resize.
-    // Store position in RAW PIXELS (Canvas Reference)? Yes.
-    // When rendering CSS, we scale it down.
-    
-    const newX = e.clientX - dragStart.x; // This is screen delta
-    const newY = e.clientY - dragStart.y;
-    
-    // Wait, dragStart was initialized with (ScreenPos - ExistingPos).
-    // So newX is indeed the new raw Position in the same unit as dragStart (Screen Pixels if position was screen pixels).
-    
-    // Let's store position in "Internal Canvas Pixels".
-    // On MouseDown: dragStart = e.clientX - (position.x / ratio)
-    // On MouseMove: position.x = (e.clientX - dragStart) * ratio
-    
-    // Actually, simpler: 
-    // Just track movement delta.
+    // SIMPLIFIED: Just track movement delta.
     const dx = e.movementX;
     const dy = e.movementY;
-    
-    const ratio = CANVAS_WIDTH / bounds.width;
     
     setPosition(prev => ({
         x: prev.x + (dx * ratio),
