@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle, Inbox, Bell } from 'lucide-react';
+import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle, Inbox, Bell, Wand2 } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
@@ -43,8 +43,15 @@ const TEXT = {
     editTitle: "编辑提示词",
     submitTitle: "提交提示词",
     lblTitle: "标题",
+    lblImgMode: "图片模式",
+    modeSingle: "单个图片",
+    modeCompare: "2张对比图",
     lblImg: "图片链接",
     lblUpload: "或上传图片 (自动裁剪16:9)",
+    lblBefore: "修改前 (Before)",
+    lblAfter: "修改后 (After)",
+    btnGenerate: "生成对比图",
+    generating: "生成中...",
     lblContent: "提示词文本",
     lblDate: "上传日期 (精确到小时)",
     lblRating: "评级",
@@ -90,8 +97,15 @@ const TEXT = {
     editTitle: "Edit Prompt",
     submitTitle: "Submit Prompt",
     lblTitle: "Title",
+    lblImgMode: "Image Mode",
+    modeSingle: "Single Image",
+    modeCompare: "Comparison (2 Imgs)",
     lblImg: "Image URL",
     lblUpload: "Or Upload Image (Auto-crop 16:9)",
+    lblBefore: "Before Image",
+    lblAfter: "After Image",
+    btnGenerate: "Generate Comparison",
+    generating: "Generating...",
     lblContent: "Prompt Content",
     lblDate: "Date (Hour precision)",
     lblRating: "Rating",
@@ -146,6 +160,13 @@ const App: React.FC = () => {
   const [editFormRating, setEditFormRating] = useState(0);
   const [editFormAuthor, setEditFormAuthor] = useState('');
   const [editFormStatus, setEditFormStatus] = useState<'approved' | 'pending' | 'rejected'>('approved');
+
+  // New Image Gen State
+  const [imageMode, setImageMode] = useState<'single' | 'compare'>('single');
+  const [compareImg1, setCompareImg1] = useState<string>('');
+  const [compareImg2, setCompareImg2] = useState<string>('');
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
 
   // Restore Session on Mount
   useEffect(() => {
@@ -330,6 +351,12 @@ const App: React.FC = () => {
     setEditFormStatus(prompt.status || 'approved');
     const formattedDate = prompt.date.length > 16 ? prompt.date.substring(0, 16) : prompt.date;
     setEditFormDate(formattedDate);
+    
+    // Reset image mode
+    setImageMode('single');
+    setCompareImg1('');
+    setCompareImg2('');
+    
     setModalType('EDIT');
   };
 
@@ -465,6 +492,11 @@ const App: React.FC = () => {
     setEditFormDate(localIso);
     setEditFormStatus(newPrompt.status || 'approved');
     
+    // Reset image mode
+    setImageMode('single');
+    setCompareImg1('');
+    setCompareImg2('');
+
     setModalType(type);
   };
 
@@ -508,7 +540,7 @@ const App: React.FC = () => {
 
 
   // Reusable Image Processing Logic (Crop to 16:9)
-  const processImageFile = (file: File) => {
+  const processImageFile = (file: File, callback: (dataUrl: string) => void) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
@@ -538,7 +570,7 @@ const App: React.FC = () => {
         const sy = (img.height - drawHeight) / 2;
         
         ctx.drawImage(img, sx, sy, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
-        setEditFormImage(canvas.toDataURL('image/jpeg', 0.85));
+        callback(canvas.toDataURL('image/jpeg', 0.85));
       };
       img.src = event.target?.result as string;
     };
@@ -547,7 +579,92 @@ const App: React.FC = () => {
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processImageFile(file);
+    if (file) {
+        processImageFile(file, (data) => setEditFormImage(data));
+    }
+  };
+
+  const handleCompareUpload = (e: React.ChangeEvent<HTMLInputElement>, target: '1' | '2') => {
+    const file = e.target.files?.[0];
+    if (file) {
+        // For comparison inputs, we strictly crop them to 16:9 individually first?
+        // Or just allow standard image loading.
+        // Let's reuse the processImageFile so they are already aspect-ratio clean or at least optimized.
+        processImageFile(file, (data) => {
+            if (target === '1') setCompareImg1(data);
+            else setCompareImg2(data);
+        });
+    }
+  };
+
+  const generateComparisonImage = async () => {
+      if (!compareImg1 || !compareImg2) return;
+      setIsGeneratingImage(true);
+
+      const canvas = document.createElement('canvas');
+      // Target 16:9 full size
+      canvas.width = 1280;
+      canvas.height = 720;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setIsGeneratingImage(false);
+        return;
+      }
+
+      const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.src = src;
+      });
+
+      try {
+          const img1 = await loadImage(compareImg1);
+          const img2 = await loadImage(compareImg2);
+
+          // Draw Helper for filling cover
+          const drawCover = (img: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) => {
+               // Calculate aspect ratios
+               const imgAspect = img.width / img.height;
+               const areaAspect = dw / dh;
+               
+               let sx, sy, sw, sh;
+
+               if (imgAspect > areaAspect) {
+                   // Image is wider than area: crop sides
+                   sh = img.height;
+                   sw = img.height * areaAspect;
+                   sy = 0;
+                   sx = (img.width - sw) / 2;
+               } else {
+                   // Image is taller than area: crop top/bottom
+                   sw = img.width;
+                   sh = img.width / areaAspect;
+                   sx = 0;
+                   sy = (img.height - sh) / 2;
+               }
+
+               ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+          };
+
+          // Draw Left Half (Before)
+          drawCover(img1, 0, 0, canvas.width / 2, canvas.height);
+
+          // Draw Right Half (After)
+          drawCover(img2, canvas.width / 2, 0, canvas.width / 2, canvas.height);
+
+          // Draw Divider Line
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect((canvas.width / 2) - 2, 0, 4, canvas.height);
+
+          // Set Result
+          setEditFormImage(canvas.toDataURL('image/jpeg', 0.9));
+
+      } catch (e) {
+          console.error("Comparison generation failed", e);
+          alert("Failed to generate comparison image");
+      } finally {
+          setIsGeneratingImage(false);
+      }
   };
 
   // Check if text is one of the default placeholders
@@ -576,7 +693,16 @@ const App: React.FC = () => {
         if (items[i].type.startsWith('image/')) {
             e.preventDefault();
             const file = items[i].getAsFile();
-            if (file) processImageFile(file);
+            if (file) {
+                if (imageMode === 'single') {
+                    processImageFile(file, (data) => setEditFormImage(data));
+                } else {
+                    // In compare mode, paste logic is ambiguous, default to Before image if empty, else After?
+                    // For simplicity, just alert or ignore in compare mode to force button usage, 
+                    // OR stick to single image behavior if user hasn't explicitly clicked upload buttons.
+                    // Let's just paste to single image preview for now or ignore.
+                }
+            }
             hasImage = true;
             return; // Stop processing if image found
         }
@@ -941,9 +1067,26 @@ const App: React.FC = () => {
             </div>
 
             <div>
-               <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblImg}</label>
+               <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblImgMode}</label>
                
-               <div className="flex flex-col gap-2">
+               <div className="flex gap-2 mb-2">
+                   <button 
+                      onClick={() => setImageMode('single')}
+                      className={`flex-1 py-1 px-2 border-2 border-black font-bold text-sm flex items-center justify-center gap-2 ${imageMode === 'single' ? 'bg-banana-yellow shadow-neo-sm' : 'bg-gray-100 hover:bg-gray-200'}`}
+                   >
+                       <ImageIcon size={16}/> {t.modeSingle}
+                   </button>
+                   <button 
+                      onClick={() => setImageMode('compare')}
+                      className={`flex-1 py-1 px-2 border-2 border-black font-bold text-sm flex items-center justify-center gap-2 ${imageMode === 'compare' ? 'bg-banana-yellow shadow-neo-sm' : 'bg-gray-100 hover:bg-gray-200'}`}
+                   >
+                       <Wand2 size={16}/> {t.modeCompare}
+                   </button>
+               </div>
+
+               {/* SINGLE IMAGE MODE INPUTS */}
+               {imageMode === 'single' && (
+                <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
                    <div className="flex gap-2">
                       <label className="flex-1 border-2 border-black border-dashed bg-gray-50 p-2 flex items-center justify-center gap-2 cursor-pointer hover:bg-yellow-50 transition-colors">
                           <Upload size={16} />
@@ -962,7 +1105,64 @@ const App: React.FC = () => {
                         className="flex-1 border-b-2 border-gray-200 focus:border-black p-1 outline-none font-mono text-sm text-gray-600" 
                       />
                    </div>
-               </div>
+                </div>
+               )}
+
+               {/* COMPARISON MODE INPUTS */}
+               {imageMode === 'compare' && (
+                   <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
+                       <div className="flex gap-2">
+                           {/* Before Image Input */}
+                           <div className="flex-1 flex flex-col gap-1">
+                               <label className="text-[10px] font-bold uppercase text-gray-500">{t.lblBefore}</label>
+                               <label className={`border-2 border-black border-dashed p-1 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-yellow-50 transition-colors h-20 ${compareImg1 ? 'bg-green-50 border-solid' : 'bg-gray-50'}`}>
+                                  {compareImg1 ? (
+                                      <div className="w-full h-full relative overflow-hidden">
+                                          <img src={compareImg1} className="w-full h-full object-cover opacity-80" />
+                                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white font-bold text-xs">OK</div>
+                                      </div>
+                                  ) : (
+                                      <>
+                                        <Upload size={16} />
+                                        <span className="text-[10px] font-bold">Upload 1</span>
+                                      </>
+                                  )}
+                                  <input type="file" accept="image/*" onChange={(e) => handleCompareUpload(e, '1')} className="hidden" />
+                               </label>
+                           </div>
+                           
+                           {/* After Image Input */}
+                           <div className="flex-1 flex flex-col gap-1">
+                               <label className="text-[10px] font-bold uppercase text-gray-500">{t.lblAfter}</label>
+                               <label className={`border-2 border-black border-dashed p-1 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-yellow-50 transition-colors h-20 ${compareImg2 ? 'bg-green-50 border-solid' : 'bg-gray-50'}`}>
+                                  {compareImg2 ? (
+                                      <div className="w-full h-full relative overflow-hidden">
+                                          <img src={compareImg2} className="w-full h-full object-cover opacity-80" />
+                                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 text-white font-bold text-xs">OK</div>
+                                      </div>
+                                  ) : (
+                                      <>
+                                        <Upload size={16} />
+                                        <span className="text-[10px] font-bold">Upload 2</span>
+                                      </>
+                                  )}
+                                  <input type="file" accept="image/*" onChange={(e) => handleCompareUpload(e, '2')} className="hidden" />
+                               </label>
+                           </div>
+                       </div>
+                       
+                       <NeoButton 
+                          variant="dark" 
+                          size="sm" 
+                          onClick={generateComparisonImage} 
+                          disabled={!compareImg1 || !compareImg2 || isGeneratingImage}
+                          className="w-full flex items-center justify-center gap-2"
+                       >
+                           {isGeneratingImage ? <Loader2 className="animate-spin" size={16}/> : <Wand2 size={16}/>}
+                           {isGeneratingImage ? t.generating : t.btnGenerate}
+                       </NeoButton>
+                   </div>
+               )}
 
                {editFormImage ? (
                  <div className="mt-2 w-full aspect-video border-2 border-black bg-gray-100 overflow-hidden relative">
@@ -971,7 +1171,7 @@ const App: React.FC = () => {
                  </div>
                ) : (
                  <div className="mt-2 w-full aspect-video border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
-                    No Image
+                    No Image Preview
                  </div>
                )}
             </div>
