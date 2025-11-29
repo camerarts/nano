@@ -653,63 +653,70 @@ const App: React.FC = () => {
     }
   };
 
-  // Global Paste Handler for Modal
-  const handleModalPaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData.items;
-    let hasImage = false;
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].type.startsWith('image/')) {
-            hasImage = true;
-            // Handle paste based on mode and active focus
-            if (imageMode === 'single') {
-                 e.preventDefault();
-                 const file = items[i].getAsFile();
-                 if (file) {
-                    processImageFile(file, (data) => setEditFormImage(data));
-                 }
-                 return;
-            } else if (imageMode === 'compare') {
-                 // Check if a specific box is active
-                 if (activeCompareBox) {
-                     e.preventDefault();
+  // Global Paste Handler Hook
+  useEffect(() => {
+    if (modalType !== 'EDIT' && modalType !== 'SUBMIT') return;
+
+    const handlePaste = (e: ClipboardEvent) => {
+        // Prevent default only if we handle it
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        let hasImage = false;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+                hasImage = true;
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (imageMode === 'single') {
                      const file = items[i].getAsFile();
                      if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (evt) => {
-                            const data = evt.target?.result as string;
-                            if (activeCompareBox === 1 && crop1Ref.current) {
-                                crop1Ref.current.setImage(data);
-                            } else if (activeCompareBox === 2 && crop2Ref.current) {
-                                crop2Ref.current.setImage(data);
-                            }
-                        };
-                        reader.readAsDataURL(file);
+                        processImageFile(file, (data) => setEditFormImage(data));
                      }
-                     return;
-                 }
+                } else if (imageMode === 'compare') {
+                     if (activeCompareBox) {
+                         const file = items[i].getAsFile();
+                         if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (evt) => {
+                                const data = evt.target?.result as string;
+                                if (activeCompareBox === 1 && crop1Ref.current) {
+                                    crop1Ref.current.setImage(data);
+                                } else if (activeCompareBox === 2 && crop2Ref.current) {
+                                    crop2Ref.current.setImage(data);
+                                }
+                            };
+                            reader.readAsDataURL(file);
+                         }
+                     }
+                }
+                return;
             }
-            // If in Compare mode but no active box, we do nothing (let default bubble happen? no, just ignore image paste)
-            return;
         }
-    }
 
-    if (!hasImage) {
-        const activeEl = document.activeElement;
-        const isInputFocused = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || activeEl?.getAttribute('contenteditable') === 'true';
-        
-        // If not focused on input, assume text append
-        if (!isInputFocused) {
-            const text = e.clipboardData.getData('text');
-            if (text) {
-                e.preventDefault();
-                setEditFormContent(prev => {
-                    if (isDefaultContent(prev)) return text;
-                    return prev + (prev ? '\n' : '') + text;
-                });
+        if (!hasImage) {
+            const activeEl = document.activeElement;
+            const isInputFocused = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || activeEl?.getAttribute('contenteditable') === 'true';
+            
+            // If not focused on an input field, append text to description
+            if (!isInputFocused) {
+                const text = e.clipboardData?.getData('text');
+                if (text) {
+                    e.preventDefault();
+                    setEditFormContent(prev => {
+                        if (prev === DEFAULT_CONTENT.zh || prev === DEFAULT_CONTENT.en) return text;
+                        return prev + (prev ? '\n' : '') + text;
+                    });
+                }
             }
         }
-    }
-  };
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [modalType, imageMode, activeCompareBox, lang]);
+
 
   return (
     <div className="min-h-screen pb-20 font-sans">
@@ -985,7 +992,7 @@ const App: React.FC = () => {
         onClose={() => !isSaving && setModalType(null)}
         title={modalType === 'SUBMIT' ? t.submitTitle : t.editTitle}
       >
-         <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2 relative" onPaste={handleModalPaste}>
+         <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2 relative">
             {isSaving && (
                <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center font-black text-xl">
                   <Loader2 className="animate-spin mr-2"/> {t.saving}
