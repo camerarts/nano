@@ -6,6 +6,9 @@ interface ImageCropperProps {
   onImageChange?: (hasImage: boolean) => void;
   isActive?: boolean;
   onClick?: () => void;
+  canvasWidth?: number;
+  canvasHeight?: number;
+  aspectClass?: string;
 }
 
 export interface ImageCropperRef {
@@ -13,7 +16,15 @@ export interface ImageCropperRef {
   setImage: (dataUrl: string) => void;
 }
 
-export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ label, onImageChange, isActive, onClick }, ref) => {
+export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ 
+  label, 
+  onImageChange, 
+  isActive, 
+  onClick,
+  canvasWidth = 640,
+  canvasHeight = 720,
+  aspectClass = "aspect-[8/9]"
+}, ref) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -24,33 +35,29 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Internal canvas resolution (8:9 vertical for split view)
-  const CANVAS_WIDTH = 640;
-  const CANVAS_HEIGHT = 720;
-
   useImperativeHandle(ref, () => ({
     getResult: async () => {
       if (!imageSrc || !imgRef.current) return null;
       
       const canvas = document.createElement('canvas');
-      canvas.width = CANVAS_WIDTH;
-      canvas.height = CANVAS_HEIGHT;
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
       // Fill background
       ctx.fillStyle = '#f3f4f6';
-      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
       const img = imgRef.current;
       
       // Calculate draw dimensions
       const imgRatio = img.naturalWidth / img.naturalHeight;
-      const canvasRatio = CANVAS_WIDTH / CANVAS_HEIGHT;
+      const canvasRatio = canvasWidth / canvasHeight;
       
       ctx.save();
       // Move to center of canvas
-      ctx.translate(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2);
+      ctx.translate(canvasWidth / 2, canvasHeight / 2);
       // Apply user transform
       ctx.translate(position.x, position.y);
       ctx.scale(scale, scale);
@@ -58,11 +65,11 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
       let baseW, baseH;
       if (imgRatio > canvasRatio) {
         // Image is wider, fit height
-        baseH = CANVAS_HEIGHT;
+        baseH = canvasHeight;
         baseW = baseH * imgRatio;
       } else {
         // Image is taller, fit width
-        baseW = CANVAS_WIDTH;
+        baseW = canvasWidth;
         baseH = baseW / imgRatio;
       }
       
@@ -77,6 +84,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
   }));
 
   const handleNewImage = (src: string) => {
+      // Clean up base64 prefix if needed, though src usually has it
       setImageSrc(src);
       setScale(1);
       setPosition({ x: 0, y: 0 });
@@ -107,7 +115,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
     if (!bounds) return;
     
     // Scale factor: canvasWidth / renderedWidth
-    const ratio = CANVAS_WIDTH / bounds.width;
+    const ratio = canvasWidth / bounds.width;
     
     const dx = e.movementX;
     const dy = e.movementY;
@@ -133,7 +141,10 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
   const getRenderStyle = () => {
       if (!containerRef.current) return {};
       const bounds = containerRef.current.getBoundingClientRect();
-      const ratio = bounds.width / CANVAS_WIDTH; 
+      // Avoid division by zero
+      if (!bounds.width) return {};
+      
+      const ratio = bounds.width / canvasWidth; 
       
       return {
           transform: `translate(-50%, -50%) translate(${position.x * ratio}px, ${position.y * ratio}px) scale(${scale})`,
@@ -148,6 +159,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
       };
   };
 
+  // Force re-render on resize to fix positioning math
   const [renderTrigger, setRenderTrigger] = useState(0);
   useEffect(() => {
       const handleResize = () => setRenderTrigger(prev => prev + 1);
@@ -175,7 +187,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
         <div 
             ref={containerRef}
             tabIndex={0}
-            className={`w-full aspect-[8/9] border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            className={`w-full ${aspectClass} border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
             onClick={(e) => { 
                 if(onClick) onClick();
                 if(!imageSrc) fileInputRef.current?.click();
@@ -207,6 +219,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
                         src={imageSrc} 
                         alt="Crop Preview" 
                         draggable={false}
+                        crossOrigin="anonymous" 
                         style={getRenderStyle()}
                     />
                     
