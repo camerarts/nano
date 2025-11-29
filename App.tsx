@@ -167,6 +167,7 @@ const App: React.FC = () => {
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [hasCompareImg1, setHasCompareImg1] = useState(false);
   const [hasCompareImg2, setHasCompareImg2] = useState(false);
+  const [activeCompareBox, setActiveCompareBox] = useState<1 | 2 | null>(null);
   
   // Cropper Refs
   const crop1Ref = useRef<ImageCropperRef>(null);
@@ -302,7 +303,6 @@ const App: React.FC = () => {
   };
 
   const handleLike = async (id: string) => {
-    // Determine unique key for user/day tracking
     const today = new Date().toISOString().split('T')[0];
     const storageKey = `nano_banana_likes_${today}`;
     
@@ -316,21 +316,18 @@ const App: React.FC = () => {
       console.error("Local storage error", e);
     }
 
-    // Check if user has already liked this specific prompt 5 times today
     const currentLikesForThisPrompt = dailyLikesMap[id] || 0;
 
     if (currentLikesForThisPrompt >= 5) {
       return;
     }
 
-    // Optimistic Update (Update UI immediately)
     setPrompts(prevPrompts => 
       prevPrompts.map(p => 
         p.id === id ? { ...p, likes: p.likes + 1 } : p
       )
     );
 
-    // Call API
     try {
       await fetch('/api/like', {
         method: 'POST',
@@ -338,7 +335,6 @@ const App: React.FC = () => {
         body: JSON.stringify({ id })
       });
       
-      // Update local storage on success
       dailyLikesMap[id] = currentLikesForThisPrompt + 1;
       localStorage.setItem(storageKey, JSON.stringify(dailyLikesMap));
     } catch (error) {
@@ -361,6 +357,7 @@ const App: React.FC = () => {
     setImageMode('single');
     setHasCompareImg1(false);
     setHasCompareImg2(false);
+    setActiveCompareBox(null);
     
     setModalType('EDIT');
   };
@@ -425,7 +422,6 @@ const App: React.FC = () => {
       if (res.ok) {
         const savedData = await res.json();
         
-        // Update local state with the returned data (which might have a new R2 URL)
         setPrompts(prev => {
           const exists = prev.find(p => p.id === savedData.id);
           if (exists) {
@@ -435,7 +431,6 @@ const App: React.FC = () => {
           }
         });
         
-        // Refresh session timestamp on activity
         if (sessionPassword) {
             localStorage.setItem(SESSION_KEY, JSON.stringify({
               password: sessionPassword,
@@ -462,12 +457,10 @@ const App: React.FC = () => {
   };
 
   const handleCreateNew = () => {
-    // Create new for Admin
     initNewPrompt('EDIT');
   };
 
   const handlePublicSubmit = () => {
-    // Create new for Public
     initNewPrompt('SUBMIT');
   };
 
@@ -501,6 +494,7 @@ const App: React.FC = () => {
     setImageMode('single');
     setHasCompareImg1(false);
     setHasCompareImg2(false);
+    setActiveCompareBox(null);
 
     setModalType(type);
   };
@@ -517,7 +511,6 @@ const App: React.FC = () => {
           date: editFormDate,
           rating: editFormRating,
           author: editFormAuthor,
-          // No password sent, backend will force 'pending' status
       };
 
       try {
@@ -531,7 +524,6 @@ const App: React.FC = () => {
               alert(t.submitSuccess);
               setModalType(null);
               setEditingPrompt(null);
-              // We don't update local prompts list because it's pending and user shouldn't see it yet
           } else {
               alert("Submission failed.");
           }
@@ -555,9 +547,7 @@ const App: React.FC = () => {
         let drawWidth = img.width;
         let drawHeight = img.width / targetRatio;
 
-        // Ensure we don't crop out empty space, center crop strategy
         if (drawHeight > img.height) {
-          // If calculated height is larger than actual, we are width-limited
           drawHeight = img.height;
           drawWidth = img.height * targetRatio;
         }
@@ -570,7 +560,6 @@ const App: React.FC = () => {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Center the crop
         const sx = (img.width - drawWidth) / 2;
         const sy = (img.height - drawHeight) / 2;
         
@@ -591,7 +580,6 @@ const App: React.FC = () => {
 
 
   const generateComparisonImage = async () => {
-      // Get the cropped results from the child components
       if (!crop1Ref.current || !crop2Ref.current) return;
       
       setIsGeneratingImage(true);
@@ -606,7 +594,6 @@ const App: React.FC = () => {
         }
 
         const canvas = document.createElement('canvas');
-        // Total Canvas size 1280x720 (16:9)
         canvas.width = 1280;
         canvas.height = 720;
         const ctx = canvas.getContext('2d');
@@ -624,20 +611,12 @@ const App: React.FC = () => {
         const img1 = await loadImage(img1Base64);
         const img2 = await loadImage(img2Base64);
 
-        // Draw Left Half (Before) - Take the center of the 16:9 input and fit to 8:9 slot
-        // Input: 1280x720. Slot: 640x720.
-        // We crop the center 640px from the input.
-        // sx = (1280-640)/2 = 320.
         ctx.drawImage(img1, 320, 0, 640, 720, 0, 0, 640, 720);
-
-        // Draw Right Half (After)
         ctx.drawImage(img2, 320, 0, 640, 720, 640, 0, 640, 720);
 
-        // Draw Divider Line
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect((canvas.width / 2) - 2, 0, 4, canvas.height);
         
-        // Add Labels "Before" / "After"
         ctx.fillStyle = 'rgba(0,0,0,0.6)';
         ctx.fillRect(10, 10, 80, 24);
         ctx.fillRect(canvas.width - 90, 10, 80, 24);
@@ -648,7 +627,6 @@ const App: React.FC = () => {
         ctx.fillText('BEFORE', 50, 27);
         ctx.fillText('AFTER', canvas.width - 50, 27);
 
-        // Set Result
         setEditFormImage(canvas.toDataURL('image/jpeg', 0.9));
       } catch (e) {
           console.error("Gen fail", e);
@@ -658,7 +636,6 @@ const App: React.FC = () => {
       }
   };
 
-  // Check if text is one of the default placeholders
   const isDefaultContent = (text: string) => {
     return text === DEFAULT_CONTENT.zh || text === DEFAULT_CONTENT.en;
   };
@@ -677,19 +654,12 @@ const App: React.FC = () => {
 
   // Global Paste Handler for Modal
   const handleModalPaste = (e: React.ClipboardEvent) => {
-    // Note: If user pastes inside ImageCropper, that component handles it and calls stopPropagation (conceptually).
-    // But since ImageCropper is a child, we need to ensure we don't double handle if focus is there.
-    // Actually the ImageCropper's onPaste will fire first. If it calls e.preventDefault(), we are good.
-    // But let's check if the target is within our croppers.
-    // Actually, just check if text.
-    
-    // 1. Check for Image in clipboard
     const items = e.clipboardData.items;
     let hasImage = false;
     for (let i = 0; i < items.length; i++) {
         if (items[i].type.startsWith('image/')) {
             hasImage = true;
-            // If we are in Single Mode, allow pasting to main preview
+            // Handle paste based on mode and active focus
             if (imageMode === 'single') {
                  e.preventDefault();
                  const file = items[i].getAsFile();
@@ -697,19 +667,36 @@ const App: React.FC = () => {
                     processImageFile(file, (data) => setEditFormImage(data));
                  }
                  return;
+            } else if (imageMode === 'compare') {
+                 // Check if a specific box is active
+                 if (activeCompareBox) {
+                     e.preventDefault();
+                     const file = items[i].getAsFile();
+                     if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (evt) => {
+                            const data = evt.target?.result as string;
+                            if (activeCompareBox === 1 && crop1Ref.current) {
+                                crop1Ref.current.setImage(data);
+                            } else if (activeCompareBox === 2 && crop2Ref.current) {
+                                crop2Ref.current.setImage(data);
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                     }
+                     return;
+                 }
             }
-            // If in Compare mode, we don't auto-paste here because user should paste into specific box
-            // We let the ImageCropper component handle it if it has focus.
+            // If in Compare mode but no active box, we do nothing (let default bubble happen? no, just ignore image paste)
             return;
         }
     }
 
-    // 2. Handle Text if not focused on inputs
     if (!hasImage) {
         const activeEl = document.activeElement;
         const isInputFocused = activeEl instanceof HTMLInputElement || activeEl instanceof HTMLTextAreaElement || activeEl?.getAttribute('contenteditable') === 'true';
         
-        // If user is just pasting into the modal without specific focus, assume content text
+        // If not focused on input, assume text append
         if (!isInputFocused) {
             const text = e.clipboardData.getData('text');
             if (text) {
@@ -742,7 +729,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* New Prompt Button - Moved here */}
             {user && (
                  <NeoButton variant="primary" onClick={handleCreateNew} className="flex items-center gap-2 animate-bounce hover:animate-none md:mr-2">
                     <Plus size={20} /> <span className="hidden sm:inline">{t.newPrompt}</span>
@@ -759,7 +745,6 @@ const App: React.FC = () => {
                     <Languages size={18} /> {t.langName}
                 </NeoButton>
 
-                {/* USER SUBMISSIONS BUTTON (Admin Only) */}
                 {user && (
                   <div className="relative">
                     <NeoButton 
@@ -810,7 +795,6 @@ const App: React.FC = () => {
         <div className="absolute bottom-20 left-20 w-8 h-8 border-2 border-black bg-white transform rotate-45"></div>
 
         <div className="container mx-auto max-w-6xl relative z-10">
-           {/* REDUCED PADDING AND HEIGHT */}
            <div className="bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-8 md:p-14 relative overflow-hidden group hover:translate-x-1 hover:translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
               <div className="absolute top-0 left-0 w-full h-2 bg-black"></div>
               <div className="absolute bottom-0 left-0 w-full h-2 bg-black"></div>
@@ -830,7 +814,6 @@ const App: React.FC = () => {
               </div>
            </div>
 
-           {/* Hero Footer Info Row - Responsive Single Line */}
            <div className="mt-6 md:mt-8 relative flex flex-row items-center justify-between w-full">
               <div className="flex gap-2 text-white font-bold text-shadow-sm z-10 md:w-auto shrink-0">
                  <span className="bg-black border-2 border-white px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-base shadow-neo-sm">{t.ver}</span>
@@ -838,7 +821,6 @@ const App: React.FC = () => {
               </div>
               
               <div className="flex items-center gap-4 z-10">
-                 {/* VISITOR COUNTER */}
                  {visitorCount !== null && (
                     <div className="flex items-center justify-end gap-1 md:gap-2 select-none shrink-0">
                         <span className="text-white font-black italic tracking-wider drop-shadow-[1px_1px_0px_rgba(0,0,0,1)] md:drop-shadow-[2px_2px_0px_rgba(0,0,0,1)] text-[8px] sm:text-[10px] md:text-base lg:text-lg">
@@ -853,7 +835,6 @@ const App: React.FC = () => {
                     </div>
                  )}
 
-                 {/* PUBLIC SUBMIT BUTTON (Only if not logged in) */}
                  {!user && (
                     <NeoButton 
                         variant="secondary" 
@@ -871,11 +852,8 @@ const App: React.FC = () => {
 
       {/* --- CONTENT GRID --- */}
       <main className="container mx-auto px-2 md:px-4 -mt-10 relative z-20">
-        
-        {/* Search Bar / Status */}
         <div className="flex justify-between items-center mb-8 bg-banana-bg flex-wrap gap-4">
            <div className="flex items-center gap-2 md:gap-4">
-              {/* Latest (Date) Sort */}
               <button 
                 onClick={() => setSortBy('date')}
                 className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
@@ -887,7 +865,6 @@ const App: React.FC = () => {
                  <Search className="w-4 h-4 md:w-6 md:h-6" strokeWidth={3} /> {t.latest}
               </button>
 
-              {/* Rating Sort */}
               <button 
                 onClick={() => setSortBy('rating')}
                 className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
@@ -905,7 +882,6 @@ const App: React.FC = () => {
            </div>
         </div>
 
-        {/* Loading State */}
         {isLoading && !user && !loginError ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-500 font-bold">
              <Loader2 size={48} className="animate-spin mb-4 text-black" />
@@ -913,7 +889,6 @@ const App: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Grid */}
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-8">
             {sortedPrompts.map((prompt) => (
               <PromptCard 
@@ -931,10 +906,8 @@ const App: React.FC = () => {
 
       {/* --- MODALS --- */}
 
-      {/* Lightbox */}
       <Lightbox imageUrl={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       
-      {/* Login Modal */}
       <Modal 
         isOpen={modalType === 'LOGIN'} 
         onClose={() => { setModalType(null); setLoginError(''); setLoginPassword(''); }}
@@ -959,7 +932,6 @@ const App: React.FC = () => {
          </div>
       </Modal>
 
-      {/* SUBMISSIONS LIST MODAL */}
       <Modal
         isOpen={modalType === 'SUBMISSIONS'}
         onClose={() => setModalType(null)}
@@ -1007,13 +979,11 @@ const App: React.FC = () => {
         </div>
       </Modal>
 
-      {/* Edit / Submit Modal */}
       <Modal
         isOpen={modalType === 'EDIT' || modalType === 'SUBMIT'}
         onClose={() => !isSaving && setModalType(null)}
         title={modalType === 'SUBMIT' ? t.submitTitle : t.editTitle}
       >
-         {/* Added onPaste handler to the container */}
          <div className="flex flex-col gap-4 max-h-[80vh] overflow-y-auto pr-2 relative" onPaste={handleModalPaste}>
             {isSaving && (
                <div className="absolute inset-0 bg-white/80 z-10 flex items-center justify-center font-black text-xl">
@@ -1079,7 +1049,6 @@ const App: React.FC = () => {
                    </button>
                </div>
 
-               {/* SINGLE IMAGE MODE INPUTS */}
                {imageMode === 'single' && (
                 <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
                    <div className="flex gap-2">
@@ -1103,7 +1072,6 @@ const App: React.FC = () => {
                 </div>
                )}
 
-               {/* COMPARISON MODE INPUTS */}
                {imageMode === 'compare' && (
                    <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
                        <div className="flex gap-2">
@@ -1112,6 +1080,8 @@ const App: React.FC = () => {
                                   ref={crop1Ref} 
                                   label={t.lblBefore} 
                                   onImageChange={setHasCompareImg1}
+                                  isActive={activeCompareBox === 1}
+                                  onClick={() => setActiveCompareBox(1)}
                                />
                            </div>
                            <div className="flex-1">
@@ -1119,6 +1089,8 @@ const App: React.FC = () => {
                                   ref={crop2Ref} 
                                   label={t.lblAfter} 
                                   onImageChange={setHasCompareImg2}
+                                  isActive={activeCompareBox === 2}
+                                  onClick={() => setActiveCompareBox(2)}
                                />
                            </div>
                        </div>
@@ -1167,7 +1139,6 @@ const App: React.FC = () => {
                />
             </div>
 
-            {/* Admin Only Fields */}
             {modalType === 'EDIT' && user && (
                 <div className="bg-gray-50 p-2 border-2 border-black border-dashed flex items-center justify-between gap-2">
                    
@@ -1192,7 +1163,6 @@ const App: React.FC = () => {
                 </div>
             )}
             
-            {/* Common Fields */}
             <div>
                <label className="block text-xs font-bold uppercase mb-1 bg-black text-white w-fit px-1">{t.lblDate}</label>
                <input 
