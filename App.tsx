@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle, Inbox, Bell, Wand2 } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
@@ -611,8 +610,10 @@ const App: React.FC = () => {
         const img1 = await loadImage(img1Base64);
         const img2 = await loadImage(img2Base64);
 
-        ctx.drawImage(img1, 320, 0, 640, 720, 0, 0, 640, 720);
-        ctx.drawImage(img2, 320, 0, 640, 720, 640, 0, 640, 720);
+        // Draw full 640x720 (8:9) image onto left side
+        ctx.drawImage(img1, 0, 0, 640, 720, 0, 0, 640, 720);
+        // Draw full 640x720 (8:9) image onto right side
+        ctx.drawImage(img2, 0, 0, 640, 720, 640, 0, 640, 720);
 
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect((canvas.width / 2) - 2, 0, 4, canvas.height);
