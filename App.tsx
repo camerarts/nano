@@ -50,6 +50,7 @@ const TEXT = {
     lblUpload: "或上传图片 (自动裁剪16:9)",
     lblBefore: "修改前 (Before)",
     lblAfter: "修改后 (After)",
+    lblPreview: "图片预览 (Prompt Image)",
     btnGenerate: "生成对比图",
     generating: "生成中...",
     lblContent: "提示词文本",
@@ -104,6 +105,7 @@ const TEXT = {
     lblUpload: "Or Upload Image (Auto-crop 16:9)",
     lblBefore: "Before Image",
     lblAfter: "After Image",
+    lblPreview: "Image Preview",
     btnGenerate: "Generate Comparison",
     generating: "Generating...",
     lblContent: "Prompt Content",
@@ -171,6 +173,7 @@ const App: React.FC = () => {
   // Cropper Refs
   const crop1Ref = useRef<ImageCropperRef>(null);
   const crop2Ref = useRef<ImageCropperRef>(null);
+  const singleCropRef = useRef<ImageCropperRef>(null);
 
 
   // Restore Session on Mount
@@ -235,6 +238,19 @@ const App: React.FC = () => {
     };
     fetchPrompts();
   }, [sessionPassword]);
+
+  // Load image into single cropper when in single mode and modal is open
+  useEffect(() => {
+    if ((modalType === 'EDIT' || modalType === 'SUBMIT') && imageMode === 'single') {
+        // Small timeout to ensure the ref is attached after render
+        const timer = setTimeout(() => {
+            if (singleCropRef.current && editFormImage) {
+                singleCropRef.current.setImage(editFormImage);
+            }
+        }, 100);
+        return () => clearTimeout(timer);
+    }
+  }, [modalType, imageMode, editingPrompt]); // editingPrompt or modalType change triggers this
 
   // Derived State
   const pendingPrompts = useMemo(() => prompts.filter(p => p.status === 'pending'), [prompts]);
@@ -399,11 +415,24 @@ const App: React.FC = () => {
     if (!editingPrompt) return;
     setIsSaving(true);
 
+    let finalImageUrl = editFormImage;
+    if (imageMode === 'single' && singleCropRef.current) {
+        // Capture the cropped result from the single image cropper
+        try {
+            const cropped = await singleCropRef.current.getResult();
+            if (cropped) {
+                finalImageUrl = cropped;
+            }
+        } catch (e) {
+            console.error("Error cropping single image", e);
+        }
+    }
+
     const updatedPromptData = {
       ...editingPrompt,
       title: editFormTitle,
       content: editFormContent,
-      imageUrl: editFormImage,
+      imageUrl: finalImageUrl,
       date: editFormDate,
       rating: editFormRating,
       author: editFormAuthor,
@@ -502,11 +531,23 @@ const App: React.FC = () => {
       if (!editingPrompt) return;
       setIsSaving(true);
       
+      let finalImageUrl = editFormImage;
+      if (imageMode === 'single' && singleCropRef.current) {
+          try {
+              const cropped = await singleCropRef.current.getResult();
+              if (cropped) {
+                  finalImageUrl = cropped;
+              }
+          } catch (e) {
+              console.error("Error cropping single image", e);
+          }
+      }
+
       const submitData = {
           ...editingPrompt,
           title: editFormTitle,
           content: editFormContent,
-          imageUrl: editFormImage,
+          imageUrl: finalImageUrl,
           date: editFormDate,
           rating: editFormRating,
           author: editFormAuthor,
@@ -532,49 +573,6 @@ const App: React.FC = () => {
       } finally {
           setIsSaving(false);
       }
-  };
-
-
-  // Reusable Image Processing Logic (Crop to 16:9)
-  const processImageFile = (file: File, callback: (dataUrl: string) => void) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const targetRatio = 16 / 9;
-        let drawWidth = img.width;
-        let drawHeight = img.width / targetRatio;
-
-        if (drawHeight > img.height) {
-          drawHeight = img.height;
-          drawWidth = img.height * targetRatio;
-        }
-
-        const MAX_WIDTH = 1280;
-        const scale = Math.min(1, MAX_WIDTH / drawWidth);
-        canvas.width = drawWidth * scale;
-        canvas.height = drawHeight * scale;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        const sx = (img.width - drawWidth) / 2;
-        const sy = (img.height - drawHeight) / 2;
-        
-        ctx.drawImage(img, sx, sy, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
-        callback(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-        processImageFile(file, (data) => setEditFormImage(data));
-    }
   };
 
 
@@ -670,9 +668,15 @@ const App: React.FC = () => {
                 e.stopPropagation();
 
                 if (imageMode === 'single') {
+                     // Route to single cropper
                      const file = items[i].getAsFile();
                      if (file) {
-                        processImageFile(file, (data) => setEditFormImage(data));
+                         const reader = new FileReader();
+                         reader.onload = (evt) => {
+                            const data = evt.target?.result as string;
+                            singleCropRef.current?.setImage(data);
+                         };
+                         reader.readAsDataURL(file);
                      }
                 } else if (imageMode === 'compare') {
                      if (activeCompareBox) {
@@ -1059,24 +1063,15 @@ const App: React.FC = () => {
 
                {imageMode === 'single' && (
                 <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
-                   <div className="flex gap-2">
-                      <label className="flex-1 border-2 border-black border-dashed bg-gray-50 p-2 flex items-center justify-center gap-2 cursor-pointer hover:bg-yellow-50 transition-colors">
-                          <Upload size={16} />
-                          <span className="text-xs font-bold">{t.lblUpload}</span>
-                          <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                      </label>
-                   </div>
-                   
-                   <div className="flex items-center gap-2">
-                      <ImageIcon size={16} className="text-gray-400" />
-                      <input 
-                        type="text" 
-                        placeholder="https://..."
-                        value={editFormImage} 
-                        onChange={(e) => setEditFormImage(e.target.value)}
-                        className="flex-1 border-b-2 border-gray-200 focus:border-black p-1 outline-none font-mono text-sm text-gray-600" 
-                      />
-                   </div>
+                    <ImageCropper 
+                        ref={singleCropRef} 
+                        label={t.lblPreview} 
+                        isActive={true}
+                        // 16:9 config
+                        aspectClass="aspect-video"
+                        canvasWidth={1280}
+                        canvasHeight={720}
+                    />
                 </div>
                )}
 
@@ -1090,6 +1085,7 @@ const App: React.FC = () => {
                                   onImageChange={setHasCompareImg1}
                                   isActive={activeCompareBox === 1}
                                   onClick={() => setActiveCompareBox(1)}
+                                  // 8:9 config (default)
                                />
                            </div>
                            <div className="flex-1">
@@ -1099,6 +1095,7 @@ const App: React.FC = () => {
                                   onImageChange={setHasCompareImg2}
                                   isActive={activeCompareBox === 2}
                                   onClick={() => setActiveCompareBox(2)}
+                                  // 8:9 config (default)
                                />
                            </div>
                        </div>
@@ -1115,16 +1112,19 @@ const App: React.FC = () => {
                        </NeoButton>
                    </div>
                )}
-
-               {editFormImage ? (
-                 <div className="mt-2 w-full aspect-video border-2 border-black bg-gray-100 overflow-hidden relative">
-                    <img src={editFormImage} alt="Preview" className="w-full h-full object-cover" />
-                    <span className="absolute bottom-0 right-0 bg-black text-white text-xs px-1">{t.preview}</span>
-                 </div>
-               ) : (
-                 <div className="mt-2 w-full aspect-video border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
-                    No Image Preview
-                 </div>
+               
+               {/* Only show preview for Compare mode, as Single mode *is* the preview */}
+               {imageMode === 'compare' && (
+                   editFormImage ? (
+                     <div className="mt-2 w-full aspect-video border-2 border-black bg-gray-100 overflow-hidden relative">
+                        <img src={editFormImage} alt="Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0 right-0 bg-black text-white text-xs px-1">{t.preview}</span>
+                     </div>
+                   ) : (
+                     <div className="mt-2 w-full aspect-video border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
+                        No Comparison Generated
+                     </div>
+                   )
                )}
             </div>
 
