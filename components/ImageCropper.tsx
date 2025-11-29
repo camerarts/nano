@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { Upload, X, Move, ZoomIn } from 'lucide-react';
 
@@ -25,8 +24,8 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Internal canvas resolution (16:9)
-  const CANVAS_WIDTH = 1280;
+  // Internal canvas resolution (8:9 vertical for split view)
+  const CANVAS_WIDTH = 640;
   const CANVAS_HEIGHT = 720;
 
   useImperativeHandle(ref, () => ({
@@ -126,7 +125,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
     const bounds = containerRef.current?.getBoundingClientRect();
     if (!bounds) return;
     
-    // Scale factor: 1280 / renderedWidth
+    // Scale factor: canvasWidth / renderedWidth
     const ratio = CANVAS_WIDTH / bounds.width;
     
     const dx = e.movementX;
@@ -196,7 +195,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({ la
             ref={containerRef}
             tabIndex={0}
             onPaste={handlePaste}
-            className={`w-full aspect-video border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            className={`w-full aspect-[8/9] border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
             onClick={(e) => { 
                 if(onClick) onClick();
                 if(!imageSrc) fileInputRef.current?.click();
