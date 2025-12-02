@@ -242,15 +242,15 @@ const App: React.FC = () => {
   // Load image into single cropper when in single mode and modal is open
   useEffect(() => {
     if ((modalType === 'EDIT' || modalType === 'SUBMIT') && imageMode === 'single') {
-        // Small timeout to ensure the ref is attached after render
+        // Wait for modal animation (duration-200) to finish so dimensions are correct
         const timer = setTimeout(() => {
             if (singleCropRef.current && editFormImage) {
                 singleCropRef.current.setImage(editFormImage);
             }
-        }, 100);
+        }, 300); // Increased to 300ms
         return () => clearTimeout(timer);
     }
-  }, [modalType, imageMode, editingPrompt]); // editingPrompt or modalType change triggers this
+  }, [modalType, imageMode, editingPrompt, editFormImage]); // Added editFormImage
 
   // Derived State
   const pendingPrompts = useMemo(() => prompts.filter(p => p.status === 'pending'), [prompts]);
