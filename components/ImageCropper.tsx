@@ -29,7 +29,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [renderTrigger, setRenderTrigger] = useState(0); // Force re-render for layout
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -55,28 +55,33 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
       const imgRatio = img.naturalWidth / img.naturalHeight;
       const canvasRatio = canvasWidth / canvasHeight;
       
-      ctx.save();
-      // Move to center of canvas
-      ctx.translate(canvasWidth / 2, canvasHeight / 2);
-      // Apply user transform
-      ctx.translate(position.x, position.y);
-      ctx.scale(scale, scale);
-      
-      let baseW, baseH;
-      if (imgRatio > canvasRatio) {
-        // Image is wider, fit height
-        baseH = canvasHeight;
-        baseW = baseH * imgRatio;
-      } else {
-        // Image is taller, fit width
-        baseW = canvasWidth;
-        baseH = baseW / imgRatio;
-      }
-      
-      ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
-      ctx.restore();
+      try {
+          ctx.save();
+          // Move to center of canvas
+          ctx.translate(canvasWidth / 2, canvasHeight / 2);
+          // Apply user transform
+          ctx.translate(position.x, position.y);
+          ctx.scale(scale, scale);
+          
+          let baseW, baseH;
+          if (imgRatio > canvasRatio) {
+            // Image is wider, fit height
+            baseH = canvasHeight;
+            baseW = baseH * imgRatio;
+          } else {
+            // Image is taller, fit width
+            baseW = canvasWidth;
+            baseH = baseW / imgRatio;
+          }
+          
+          ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
+          ctx.restore();
 
-      return canvas.toDataURL('image/jpeg', 0.9);
+          return canvas.toDataURL('image/jpeg', 0.9);
+      } catch (e) {
+          console.warn("Canvas tainted, cannot crop/export image (CORS). Returning null.", e);
+          return null;
+      }
     },
     setImage: (dataUrl: string) => {
         handleNewImage(dataUrl);
@@ -84,7 +89,6 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   }));
 
   const handleNewImage = (src: string) => {
-      // Clean up base64 prefix if needed, though src usually has it
       setImageSrc(src);
       setScale(1);
       setPosition({ x: 0, y: 0 });
@@ -106,19 +110,34 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
     if (onClick) onClick(); // Activate on interaction
     if (!imageSrc) return;
     setIsDragging(true);
-    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+    // Calculate drag start based on current position
+    // We store the cursor position relative to the current image position
+    // e.clientX is global, position.x is translate offset
+    // This part is a bit tricky with React state, simplified logic:
+    // Store where the mouse IS
+    // On Move, calculate Delta
+    (containerRef.current as any).lastMouseX = e.clientX;
+    (containerRef.current as any).lastMouseY = e.clientY;
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
+    
     const bounds = containerRef.current?.getBoundingClientRect();
     if (!bounds) return;
     
-    // Scale factor: canvasWidth / renderedWidth
-    const ratio = canvasWidth / bounds.width;
+    const lastX = (containerRef.current as any).lastMouseX || e.clientX;
+    const lastY = (containerRef.current as any).lastMouseY || e.clientY;
+
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
     
-    const dx = e.movementX;
-    const dy = e.movementY;
+    (containerRef.current as any).lastMouseX = e.clientX;
+    (containerRef.current as any).lastMouseY = e.clientY;
+
+    // Scale factor: canvasWidth / renderedWidth
+    // If the box is 300px wide but represents 1280px canvas, 1px mouse move = 4.2px canvas move
+    const ratio = canvasWidth / bounds.width;
     
     setPosition(prev => ({
         x: prev.x + (dx * ratio),
@@ -139,10 +158,11 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   };
 
   const getRenderStyle = () => {
-      if (!containerRef.current) return {};
+      if (!containerRef.current) return { display: 'none' };
       const bounds = containerRef.current.getBoundingClientRect();
-      // Avoid division by zero
-      if (!bounds.width) return {};
+      
+      // If bounds are 0 (hidden/animating), hide image to prevent jumping
+      if (!bounds.width || !bounds.height) return { opacity: 0 };
       
       const ratio = bounds.width / canvasWidth; 
       
@@ -156,15 +176,18 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
           objectFit: 'cover' as 'cover',
           cursor: isDragging ? 'grabbing' : 'grab',
           userSelect: 'none' as 'none',
+          opacity: 1
       };
   };
 
-  // Force re-render on resize to fix positioning math
-  const [renderTrigger, setRenderTrigger] = useState(0);
+  // ResizeObserver to handle modal animations showing the container
   useEffect(() => {
-      const handleResize = () => setRenderTrigger(prev => prev + 1);
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+        setRenderTrigger(prev => prev + 1);
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
   }, []);
 
   return (
@@ -219,9 +242,10 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                         src={imageSrc} 
                         alt="Crop Preview" 
                         draggable={false}
-                        crossOrigin="anonymous" 
+                        // Removed crossOrigin to fix preview visibility. 
+                        // Note: This may taint canvas if saving without CORS, handled in getResult
                         style={getRenderStyle()}
-                        onLoad={() => setRenderTrigger(prev => prev + 1)} // Force re-calc
+                        onLoad={() => setRenderTrigger(prev => prev + 1)}
                     />
                     
                     {/* Overlay Hints */}
