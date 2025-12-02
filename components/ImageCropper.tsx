@@ -221,6 +221,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                         draggable={false}
                         crossOrigin="anonymous" 
                         style={getRenderStyle()}
+                        onLoad={() => setRenderTrigger(prev => prev + 1)} // Force re-calc
                     />
                     
                     {/* Overlay Hints */}
