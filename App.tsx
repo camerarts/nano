@@ -242,15 +242,13 @@ const App: React.FC = () => {
   // Load image into single cropper when in single mode and modal is open
   useEffect(() => {
     if ((modalType === 'EDIT' || modalType === 'SUBMIT') && imageMode === 'single') {
-        // Wait for modal animation (duration-200) to finish so dimensions are correct
-        const timer = setTimeout(() => {
-            if (singleCropRef.current && editFormImage) {
-                singleCropRef.current.setImage(editFormImage);
-            }
-        }, 300); // Increased to 300ms
-        return () => clearTimeout(timer);
+        // We rely on the ImageCropper's internal ResizeObserver to handle layout.
+        // We just need to ensure the image data is passed.
+        if (singleCropRef.current && editFormImage) {
+            singleCropRef.current.setImage(editFormImage);
+        }
     }
-  }, [modalType, imageMode, editingPrompt, editFormImage]); // Added editFormImage
+  }, [modalType, imageMode, editingPrompt, editFormImage]);
 
   // Derived State
   const pendingPrompts = useMemo(() => prompts.filter(p => p.status === 'pending'), [prompts]);
@@ -420,6 +418,7 @@ const App: React.FC = () => {
         // Capture the cropped result from the single image cropper
         try {
             const cropped = await singleCropRef.current.getResult();
+            // If cropped is null (e.g. tainted canvas/CORS), keep original image
             if (cropped) {
                 finalImageUrl = cropped;
             }
