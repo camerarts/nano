@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle, Inbox, Bell, Wand2 } from 'lucide-react';
+import { User as UserIcon, LogOut, Search, Plus, Sparkles, Star, Languages, Upload, Image as ImageIcon, ClipboardPaste, Loader2, ArrowUpDown, Eye, Trash2, CheckCircle, XCircle, Inbox, Bell, Wand2, Download } from 'lucide-react';
 import { Prompt, User, ModalType } from './types';
+import { downloadImage } from './services/downloadImage';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
 import { Modal } from './components/Modal';
@@ -57,6 +58,7 @@ const TEXT = {
     lblAfter: "修改后 (After)",
     lblPreview: "图片预览 (Prompt Image)",
     btnGenerate: "生成对比图",
+    download: "下载图片",
     generating: "生成中...",
     lblContent: "提示词文本",
     lblDate: "上传日期 (精确到小时)",
@@ -117,6 +119,7 @@ const TEXT = {
     lblAfter: "After Image",
     lblPreview: "Image Preview",
     btnGenerate: "Generate Comparison",
+    download: "Download image",
     generating: "Generating...",
     lblContent: "Prompt Content",
     lblDate: "Date (Hour precision)",
@@ -1242,7 +1245,19 @@ const App: React.FC = () => {
                            onDoubleClick={() => setLightboxUrl(editFormImage)}
                            className="w-full h-full object-contain cursor-zoom-in"
                         />
-                        <span className="absolute bottom-0 right-0 bg-black text-white text-xs px-1">{t.preview}</span>
+                        <span className="absolute top-0 left-0 bg-black text-white text-xs px-1">{t.preview}</span>
+                        <button
+                           type="button"
+                           title={t.download}
+                           aria-label={t.download}
+                           onClick={(e) => {
+                               e.stopPropagation();
+                               void downloadImage(editFormImage, `对比图-${Date.now()}.jpg`);
+                           }}
+                           className="absolute bottom-2 right-2 z-10 p-1.5 bg-banana-yellow border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all"
+                        >
+                           <Download size={16} strokeWidth={3} />
+                        </button>
                      </div>
                    ) : (
                      <div className="mt-2 w-full border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm" style={{ aspectRatio: String(comparePreviewRatio) }}>

@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { Prompt } from '../types';
-import { Heart, Copy, Edit2, CornerDownRight, Star, Clock } from 'lucide-react';
+import { Heart, Copy, Edit2, CornerDownRight, Star, Clock, Download } from 'lucide-react';
 import { NeoButton } from './ui/NeoButton';
+import { downloadImage, getImageExtension } from '../services/downloadImage';
 
 interface PromptCardProps {
   prompt: Prompt;
@@ -18,6 +19,7 @@ const LABELS = {
     official: "官方",
     copy: "复制",
     copied: "已复制!",
+    download: "下载图片",
     justNow: "刚刚",
     minsAgo: "分钟前",
     hoursAgo: "小时前",
@@ -30,6 +32,7 @@ const LABELS = {
     official: "OFFICIAL",
     copy: "COPY",
     copied: "COPIED!",
+    download: "Download image",
     justNow: "Just now",
     minsAgo: "mins ago",
     hoursAgo: "hours ago",
@@ -143,6 +146,19 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
              />
              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
              </div>
+             {/* 鼠标移到图片上时右下角浮出下载按钮；阻止冒泡，避免同时打开灯箱 */}
+             <button
+               type="button"
+               title={t.download}
+               aria-label={t.download}
+               onClick={(e) => {
+                 e.stopPropagation();
+                 void downloadImage(prompt.imageUrl!, `${prompt.title}.${getImageExtension(prompt.imageUrl!)}`);
+               }}
+               className="absolute bottom-2 right-2 z-10 p-1.5 bg-banana-yellow border-2 border-black shadow-neo-sm opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 active:scale-100"
+             >
+               <Download size={14} strokeWidth={3} />
+             </button>
           </div>
         )}
 
