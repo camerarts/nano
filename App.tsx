@@ -46,6 +46,12 @@ const TEXT = {
     lblImgMode: "图片模式",
     modeSingle: "单个图片",
     modeCompare: "2张对比图",
+    layoutTitle: "排列方式",
+    layoutLR: "左右",
+    layoutTB: "上下",
+    alignTitle: "对齐样式",
+    alignHeight: "高度对齐",
+    alignWidth: "宽度对齐",
     lblImg: "图片链接",
     lblUpload: "或上传图片 (自动裁剪16:9)",
     lblBefore: "修改前 (Before)",
@@ -101,6 +107,12 @@ const TEXT = {
     lblImgMode: "Image Mode",
     modeSingle: "Single Image",
     modeCompare: "Comparison (2 Imgs)",
+    layoutTitle: "Layout",
+    layoutLR: "Left / Right",
+    layoutTB: "Top / Bottom",
+    alignTitle: "Alignment",
+    alignHeight: "Align by height",
+    alignWidth: "Align by width",
     lblImg: "Image URL",
     lblUpload: "Or Upload Image (Auto-crop 16:9)",
     lblBefore: "Before Image",
@@ -169,6 +181,9 @@ const App: React.FC = () => {
   const [hasCompareImg1, setHasCompareImg1] = useState(false);
   const [hasCompareImg2, setHasCompareImg2] = useState(false);
   const [activeCompareBox, setActiveCompareBox] = useState<1 | 2 | null>(null);
+  // 对比图排列/对齐：均为可选，null = 沿用默认（各自等比 contain 后居中）
+  const [compareLayout, setCompareLayout] = useState<'lr' | 'tb' | null>(null);
+  const [compareAlign, setCompareAlign] = useState<'height' | 'width' | null>(null);
   // 合成图的实际宽高比，预览按这个比例显示，不再强制 16:9 裁切
   const [comparePreviewRatio, setComparePreviewRatio] = useState(16 / 9);
   
@@ -524,6 +539,8 @@ const App: React.FC = () => {
     setHasCompareImg1(false);
     setHasCompareImg2(false);
     setActiveCompareBox(null);
+    setCompareLayout(null);
+    setCompareAlign(null);
 
     setModalType(type);
   };
@@ -577,6 +594,31 @@ const App: React.FC = () => {
   };
 
 
+  // 排列方式决定哪一种对齐可用：左右→高度对齐；上下→宽度对齐
+  const selectCompareLayout = (layout: 'lr' | 'tb') => {
+      setCompareLayout(layout);
+      setCompareAlign(prev => {
+          if (!prev) return null;
+          const incompatible = (layout === 'lr' && prev === 'width') || (layout === 'tb' && prev === 'height');
+          return incompatible ? null : prev;
+      });
+  };
+
+  const selectCompareAlign = (align: 'height' | 'width') => {
+      setCompareAlign(align);
+      // 选了对齐就必须知道往哪个方向排；直接成对设置，避免留下一组无效状态
+      setCompareLayout(align === 'height' ? 'lr' : 'tb');
+  };
+
+  const optionClass = (active: boolean, disabled = false) =>
+      `px-2 py-1 border-2 border-black text-[11px] font-bold transition-colors ${
+          disabled
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
+              : active
+                  ? 'bg-banana-yellow shadow-neo-sm'
+                  : 'bg-gray-100 hover:bg-gray-200'
+      }`;
+
   const generateComparisonImage = async () => {
       if (!crop1Ref.current || !crop2Ref.current) return;
       
@@ -600,27 +642,84 @@ const App: React.FC = () => {
         const img1 = await loadImage(img1Base64);
         const img2 = await loadImage(img2Base64);
 
-        // 两张图各自保留原比例，等比缩放后放进自适应画布（contain，不裁切不拉伸）
+        // 无论哪种排列/对齐，都只做等比缩放，绝不裁切或拉伸原图
         const MAX_W = 560;
         const MAX_H = 720;
         const GAP = 24;
         const PAD = 24;
         const LABEL_H = 40;
-        const fit = (img: HTMLImageElement) => {
-            const scale = Math.min(MAX_W / img.naturalWidth, MAX_H / img.naturalHeight, 1);
-            return {
-                w: Math.max(1, Math.round(img.naturalWidth * scale)),
-                h: Math.max(1, Math.round(img.naturalHeight * scale)),
-            };
+        const n1 = { w: img1.naturalWidth || 1, h: img1.naturalHeight || 1 };
+        const n2 = { w: img2.naturalWidth || 1, h: img2.naturalHeight || 1 };
+
+        type Placed = {
+            img: HTMLImageElement;
+            x: number; y: number; w: number; h: number;
+            labelX: number; labelY: number; label: string;
         };
-        const f1 = fit(img1);
-        const f2 = fit(img2);
-        const halfW = Math.max(f1.w, f2.w);
-        const contentH = Math.max(f1.h, f2.h);
+        let placed: Placed[] = [];
+        let canvasW = 0;
+        let canvasH = 0;
+        let divider: { x: number; y: number; w: number; h: number } | null = null;
+
+        if (compareLayout === 'lr' && compareAlign === 'height') {
+            // 左右 + 高度对齐：两图等高，宽度各按原比例
+            const targetH = Math.max(1, Math.floor(Math.min(
+                MAX_H, n1.h, n2.h,
+                MAX_W * n1.h / n1.w,
+                MAX_W * n2.h / n2.w,
+            )));
+            const w1 = Math.max(1, Math.round(n1.w * targetH / n1.h));
+            const w2 = Math.max(1, Math.round(n2.w * targetH / n2.h));
+            canvasW = PAD * 2 + w1 + GAP + w2;
+            canvasH = PAD * 2 + LABEL_H + targetH;
+            const y = PAD + LABEL_H;
+            const x2 = PAD + w1 + GAP;
+            placed = [
+                { img: img1, x: PAD, y, w: w1, h: targetH, labelX: PAD + w1 / 2, labelY: PAD + LABEL_H / 2, label: 'BEFORE' },
+                { img: img2, x: x2, y, w: w2, h: targetH, labelX: x2 + w2 / 2, labelY: PAD + LABEL_H / 2, label: 'AFTER' },
+            ];
+            divider = { x: PAD + w1 + GAP / 2 - 1, y, w: 2, h: targetH };
+        } else if (compareLayout === 'tb' && compareAlign === 'width') {
+            // 上下 + 宽度对齐：两图等宽，高度各按原比例
+            const targetW = Math.max(1, Math.floor(Math.min(
+                MAX_W, n1.w, n2.w,
+                MAX_H * n1.w / n1.h,
+                MAX_H * n2.w / n2.h,
+            )));
+            const h1 = Math.max(1, Math.round(n1.h * targetW / n1.w));
+            const h2 = Math.max(1, Math.round(n2.h * targetW / n2.w));
+            const y1 = PAD + LABEL_H;
+            const y2 = y1 + h1 + GAP + LABEL_H;
+            canvasW = PAD * 2 + targetW;
+            canvasH = PAD * 2 + LABEL_H * 2 + GAP + h1 + h2;
+            placed = [
+                { img: img1, x: PAD, y: y1, w: targetW, h: h1, labelX: PAD + targetW / 2, labelY: PAD + LABEL_H / 2, label: 'BEFORE' },
+                { img: img2, x: PAD, y: y2, w: targetW, h: h2, labelX: PAD + targetW / 2, labelY: y1 + h1 + GAP + LABEL_H / 2, label: 'AFTER' },
+            ];
+            divider = { x: PAD, y: y1 + h1 + GAP / 2 - 1, w: targetW, h: 2 };
+        } else {
+            // 未选择排列/对齐：沿用默认——各自等比 contain 后在等大格子里居中
+            const fit = (n: { w: number; h: number }) => {
+                const scale = Math.min(MAX_W / n.w, MAX_H / n.h, 1);
+                return { w: Math.max(1, Math.round(n.w * scale)), h: Math.max(1, Math.round(n.h * scale)) };
+            };
+            const f1 = fit(n1);
+            const f2 = fit(n2);
+            const halfW = Math.max(f1.w, f2.w);
+            const contentH = Math.max(f1.h, f2.h);
+            canvasW = PAD * 2 + halfW * 2 + GAP;
+            canvasH = PAD * 2 + LABEL_H + contentH;
+            const x2 = PAD + halfW + GAP;
+            placed = [
+                { img: img1, x: PAD + (halfW - f1.w) / 2, y: PAD + LABEL_H + (contentH - f1.h) / 2, w: f1.w, h: f1.h, labelX: PAD + halfW / 2, labelY: PAD + LABEL_H / 2, label: 'BEFORE' },
+                { img: img2, x: x2 + (halfW - f2.w) / 2, y: PAD + LABEL_H + (contentH - f2.h) / 2, w: f2.w, h: f2.h, labelX: x2 + halfW / 2, labelY: PAD + LABEL_H / 2, label: 'AFTER' },
+            ];
+            divider = { x: PAD + halfW + GAP / 2 - 1, y: PAD + LABEL_H, w: 2, h: contentH };
+        }
 
         const canvas = document.createElement('canvas');
-        canvas.width = PAD * 2 + halfW * 2 + GAP;
-        canvas.height = PAD * 2 + LABEL_H + contentH;
+        canvas.width = canvasW;
+        canvas.height = canvasH;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
             setIsGeneratingImage(false);
@@ -630,32 +729,24 @@ const App: React.FC = () => {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        const halves = [
-            { img: img1, size: f1, index: 0, label: 'BEFORE' },
-            { img: img2, size: f2, index: 1, label: 'AFTER' },
-        ];
-        for (const half of halves) {
-            const left = PAD + half.index * (halfW + GAP);
-            const centerX = left + halfW / 2;
-            const x = left + (halfW - half.size.w) / 2;
-            const y = PAD + LABEL_H + (contentH - half.size.h) / 2;
-            ctx.drawImage(half.img, x, y, half.size.w, half.size.h);
-
-            // 标签放在各自一格的正上方，不压住图片内容
+        for (const item of placed) {
+            ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
+            // 标签放在各自图片正上方，不压住内容
             const chipW = 84;
             const chipH = 24;
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(centerX - chipW / 2, PAD + (LABEL_H - chipH) / 2, chipW, chipH);
+            ctx.fillRect(item.labelX - chipW / 2, item.labelY - chipH / 2, chipW, chipH);
             ctx.font = 'bold 13px sans-serif';
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(half.label, centerX, PAD + LABEL_H / 2);
+            ctx.fillText(item.label, item.labelX, item.labelY);
         }
 
-        // 中间分隔线只画在图片内容区，不穿过标签
-        ctx.fillStyle = '#111827';
-        ctx.fillRect(PAD + halfW + GAP / 2 - 1, PAD + LABEL_H, 2, contentH);
+        if (divider) {
+            ctx.fillStyle = '#111827';
+            ctx.fillRect(divider.x, divider.y, divider.w, divider.h);
+        }
 
         setComparePreviewRatio(canvas.width / canvas.height);
         setEditFormImage(canvas.toDataURL('image/jpeg', 0.9));
@@ -1131,6 +1222,30 @@ const App: React.FC = () => {
                                   // 上传图是什么比例就按什么比例显示/导出，不裁切
                                   preserveAspect={true}
                                />
+                           </div>
+                       </div>
+
+                       {/* 排列方式 / 对齐样式：均为可选；左右只能配高度对齐，上下只能配宽度对齐 */}
+                       <div className="flex flex-col gap-1.5 border-t-2 border-black/10 pt-2">
+                           <div className="flex items-center gap-2">
+                               <span className="text-[10px] font-bold uppercase text-gray-600 shrink-0 w-14">{t.layoutTitle}</span>
+                               <button type="button"
+                                   className={optionClass(compareLayout === 'lr')}
+                                   onClick={() => selectCompareLayout('lr')}>{t.layoutLR}</button>
+                               <button type="button"
+                                   className={optionClass(compareLayout === 'tb')}
+                                   onClick={() => selectCompareLayout('tb')}>{t.layoutTB}</button>
+                           </div>
+                           <div className="flex items-center gap-2">
+                               <span className="text-[10px] font-bold uppercase text-gray-600 shrink-0 w-14">{t.alignTitle}</span>
+                               <button type="button"
+                                   disabled={compareLayout === 'tb'}
+                                   className={optionClass(compareAlign === 'height', compareLayout === 'tb')}
+                                   onClick={() => selectCompareAlign('height')}>{t.alignHeight}</button>
+                               <button type="button"
+                                   disabled={compareLayout === 'lr'}
+                                   className={optionClass(compareAlign === 'width', compareLayout === 'lr')}
+                                   onClick={() => selectCompareAlign('width')}>{t.alignWidth}</button>
                            </div>
                        </div>
                        
