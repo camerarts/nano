@@ -28,14 +28,20 @@ export const downloadImage = async (url: string, filename: string) => {
     if (!url) return;
     const name = safeFileName(filename);
     try {
-        const res = await fetch(url);
+        // 跨域图片（R2 公共域无 CORS）必须走同源代理，否则浏览器会忽略 a[download] 直接打开图片
+        const target = url.startsWith('data:') || url.startsWith('blob:')
+            ? url
+            : `/api/image-proxy?url=${encodeURIComponent(url)}&name=${encodeURIComponent(name)}`;
+        const res = await fetch(target);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const contentType = res.headers.get('content-type') || '';
+        if (!contentType.startsWith('image/')) throw new Error('Not an image');
         const blob = await res.blob();
         const objectUrl = URL.createObjectURL(blob);
         triggerDownload(objectUrl, name);
         window.setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
     } catch {
-        // 跨域图取不到 blob 时退回直链（data URL / 同源 / 带 CORS 的图可正常下载）
+        // 代理不可用时退回直链；data URL / 同源图仍可直接下载
         triggerDownload(url, name);
     }
 };
