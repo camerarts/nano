@@ -33,7 +33,7 @@ const TEXT = {
     public: "公开",
     newPrompt: "新增提示词",
     latest: "最新提示词",
-    sortRating: "提示词排序",
+    sortRating: "星级排序",
     total: "总计",
     adminTitle: "管理员登陆",
     adminDesc: "请输入管理员密码以编辑内容。",
@@ -49,9 +49,8 @@ const TEXT = {
     layoutTitle: "排列方式",
     layoutLR: "左右",
     layoutTB: "上下",
-    alignTitle: "对齐样式",
-    alignHeight: "高度对齐",
-    alignWidth: "宽度对齐",
+    autoAlignHeight: "对齐样式：高度对齐（自动）",
+    autoAlignWidth: "对齐样式：宽度对齐（自动）",
     lblImg: "图片链接",
     lblUpload: "或上传图片 (自动裁剪16:9)",
     lblBefore: "修改前 (Before)",
@@ -94,7 +93,7 @@ const TEXT = {
     public: "PUBLIC",
     newPrompt: "New Prompt",
     latest: "Latest Prompts",
-    sortRating: "Sort by Rating",
+    sortRating: "Sort by Stars",
     total: "Total",
     adminTitle: "Admin Login",
     adminDesc: "Enter admin password to edit content.",
@@ -110,9 +109,8 @@ const TEXT = {
     layoutTitle: "Layout",
     layoutLR: "Left / Right",
     layoutTB: "Top / Bottom",
-    alignTitle: "Alignment",
-    alignHeight: "Align by height",
-    alignWidth: "Align by width",
+    autoAlignHeight: "Alignment: by height (auto)",
+    autoAlignWidth: "Alignment: by width (auto)",
     lblImg: "Image URL",
     lblUpload: "Or Upload Image (Auto-crop 16:9)",
     lblBefore: "Before Image",
@@ -157,6 +155,16 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'date' | 'rating'>('date');
+  // 同一排序按钮二次点击反向；切换按钮时回到默认降序
+  const [sortAsc, setSortAsc] = useState(false);
+  const handleSort = (type: 'date' | 'rating') => {
+      if (sortBy === type) {
+          setSortAsc(prev => !prev);
+      } else {
+          setSortBy(type);
+          setSortAsc(false);
+      }
+  };
   const [visitorCount, setVisitorCount] = useState<number | null>(null);
   
   const t = TEXT[lang];
@@ -181,9 +189,8 @@ const App: React.FC = () => {
   const [hasCompareImg1, setHasCompareImg1] = useState(false);
   const [hasCompareImg2, setHasCompareImg2] = useState(false);
   const [activeCompareBox, setActiveCompareBox] = useState<1 | 2 | null>(null);
-  // 对比图排列/对齐：均为可选，null = 沿用默认（各自等比 contain 后居中）
+  // 对比图排列：可选，null = 默认左右并排；对齐由后台按排列自动决定
   const [compareLayout, setCompareLayout] = useState<'lr' | 'tb' | null>(null);
-  const [compareAlign, setCompareAlign] = useState<'height' | 'width' | null>(null);
   // 合成图的实际宽高比，预览按这个比例显示，不再强制 16:9 裁切
   const [comparePreviewRatio, setComparePreviewRatio] = useState(16 / 9);
   
@@ -274,20 +281,20 @@ const App: React.FC = () => {
   // Memoized Sorted Prompts
   const sortedPrompts = useMemo(() => {
     const p = [...prompts];
+    const dir = sortAsc ? 1 : -1; // 默认降序；同一按钮再点一次升序
     if (sortBy === 'rating') {
-      // Sort by Rating Desc, then Likes Desc, then Date Desc
+      // 按星级排序：星级 → 点赞数 → 时间，二次点击整体反向
       return p.sort((a, b) => {
-        const ratingDiff = (b.rating || 0) - (a.rating || 0);
-        if (ratingDiff !== 0) return ratingDiff;
-        const likeDiff = b.likes - a.likes;
-        if (likeDiff !== 0) return likeDiff;
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
+        const ratingDiff = (a.rating || 0) - (b.rating || 0);
+        if (ratingDiff !== 0) return dir * ratingDiff;
+        const likeDiff = a.likes - b.likes;
+        if (likeDiff !== 0) return dir * likeDiff;
+        return dir * (new Date(a.date).getTime() - new Date(b.date).getTime());
       });
-    } else {
-      // Sort by Date Desc (Default)
-      return p.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
-  }, [prompts, sortBy]);
+    // 按时间排序：默认最新在前，二次点击最旧在前
+    return p.sort((a, b) => dir * (new Date(a.date).getTime() - new Date(b.date).getTime()));
+  }, [prompts, sortBy, sortAsc]);
 
   const handleLogin = async () => {
     if (!loginPassword.trim()) return;
@@ -540,7 +547,6 @@ const App: React.FC = () => {
     setHasCompareImg2(false);
     setActiveCompareBox(null);
     setCompareLayout(null);
-    setCompareAlign(null);
 
     setModalType(type);
   };
@@ -594,29 +600,11 @@ const App: React.FC = () => {
   };
 
 
-  // 排列方式决定哪一种对齐可用：左右→高度对齐；上下→宽度对齐
-  const selectCompareLayout = (layout: 'lr' | 'tb') => {
-      setCompareLayout(layout);
-      setCompareAlign(prev => {
-          if (!prev) return null;
-          const incompatible = (layout === 'lr' && prev === 'width') || (layout === 'tb' && prev === 'height');
-          return incompatible ? null : prev;
-      });
-  };
+  const selectCompareLayout = (layout: 'lr' | 'tb') => setCompareLayout(layout);
 
-  const selectCompareAlign = (align: 'height' | 'width') => {
-      setCompareAlign(align);
-      // 选了对齐就必须知道往哪个方向排；直接成对设置，避免留下一组无效状态
-      setCompareLayout(align === 'height' ? 'lr' : 'tb');
-  };
-
-  const optionClass = (active: boolean, disabled = false) =>
+  const optionClass = (active: boolean) =>
       `px-2 py-1 border-2 border-black text-[11px] font-bold transition-colors ${
-          disabled
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-60'
-              : active
-                  ? 'bg-banana-yellow shadow-neo-sm'
-                  : 'bg-gray-100 hover:bg-gray-200'
+          active ? 'bg-banana-yellow shadow-neo-sm' : 'bg-gray-100 hover:bg-gray-200'
       }`;
 
   const generateComparisonImage = async () => {
@@ -661,13 +649,8 @@ const App: React.FC = () => {
         let canvasH = 0;
         let divider: { x: number; y: number; w: number; h: number } | null = null;
 
-        const fit = (n: { w: number; h: number }) => {
-            const scale = Math.min(MAX_W / n.w, MAX_H / n.h, 1);
-            return { w: Math.max(1, Math.round(n.w * scale)), h: Math.max(1, Math.round(n.h * scale)) };
-        };
-
-        if (compareLayout === 'tb' && compareAlign === 'width') {
-            // 上下 + 宽度对齐：两图等宽，高度各按原比例
+        if (compareLayout === 'tb') {
+            // 上下排列：后台自动宽度对齐，两图等宽，高度各按原比例
             const targetW = Math.max(1, Math.floor(Math.min(
                 MAX_W, n1.w, n2.w,
                 MAX_H * n1.w / n1.h,
@@ -684,22 +667,8 @@ const App: React.FC = () => {
                 { img: img2, x: PAD, y: y2, w: targetW, h: h2, label: 'AFTER', labelSide: 'right' },
             ];
             divider = { x: PAD, y: y1 + h1 + GAP / 2 - 1, w: targetW, h: 2 };
-        } else if (compareLayout === 'tb') {
-            // 上下但未选对齐：各自等比缩放后堆叠、水平居中
-            const f1 = fit(n1);
-            const f2 = fit(n2);
-            const stackW = Math.max(f1.w, f2.w);
-            const y1 = PAD;
-            const y2 = PAD + f1.h + GAP;
-            canvasW = PAD * 2 + stackW;
-            canvasH = PAD * 2 + GAP + f1.h + f2.h;
-            placed = [
-                { img: img1, x: PAD + (stackW - f1.w) / 2, y: y1, w: f1.w, h: f1.h, label: 'BEFORE', labelSide: 'left' },
-                { img: img2, x: PAD + (stackW - f2.w) / 2, y: y2, w: f2.w, h: f2.h, label: 'AFTER', labelSide: 'right' },
-            ];
-            divider = { x: PAD, y: y1 + f1.h + GAP / 2 - 1, w: stackW, h: 2 };
         } else {
-            // 默认 / 左右 / 高度对齐：两图等高并排，贴满画布高度（参考图样式，四周无空白）
+            // 默认 / 左右排列：后台自动高度对齐，两图等高并排，贴满画布高度（四周无空白）
             const targetH = Math.max(1, Math.floor(Math.min(
                 MAX_H, n1.h, n2.h,
                 MAX_W * n1.h / n1.w,
@@ -996,7 +965,7 @@ const App: React.FC = () => {
         <div className="flex justify-between items-center mb-8 bg-banana-bg flex-wrap gap-4">
            <div className="flex items-center gap-2 md:gap-4">
               <button 
-                onClick={() => setSortBy('date')}
+                onClick={() => handleSort('date')}
                 className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
                   ${sortBy === 'date' 
                     ? 'bg-white shadow-neo scale-100 z-10' 
@@ -1004,10 +973,11 @@ const App: React.FC = () => {
                 `}
               >
                  <Search className="w-4 h-4 md:w-6 md:h-6" strokeWidth={3} /> {t.latest}
+                 {sortBy === 'date' && <span className="text-xs">{sortAsc ? '↑' : '↓'}</span>}
               </button>
 
               <button 
-                onClick={() => setSortBy('rating')}
+                onClick={() => handleSort('rating')}
                 className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
                   ${sortBy === 'rating' 
                     ? 'bg-white shadow-neo scale-100 z-10' 
@@ -1015,6 +985,7 @@ const App: React.FC = () => {
                 `}
               >
                  <ArrowUpDown className="w-4 h-4 md:w-6 md:h-6" strokeWidth={3} /> {t.sortRating}
+                 {sortBy === 'rating' && <span className="text-xs">{sortAsc ? '↑' : '↓'}</span>}
               </button>
            </div>
            
@@ -1242,17 +1213,9 @@ const App: React.FC = () => {
                                    className={optionClass(compareLayout === 'tb')}
                                    onClick={() => selectCompareLayout('tb')}>{t.layoutTB}</button>
                            </div>
-                           <div className="flex items-center gap-2">
-                               <span className="text-[10px] font-bold uppercase text-gray-600 shrink-0 w-14">{t.alignTitle}</span>
-                               <button type="button"
-                                   disabled={compareLayout === 'tb'}
-                                   className={optionClass(compareAlign === 'height', compareLayout === 'tb')}
-                                   onClick={() => selectCompareAlign('height')}>{t.alignHeight}</button>
-                               <button type="button"
-                                   disabled={compareLayout === 'lr'}
-                                   className={optionClass(compareAlign === 'width', compareLayout === 'lr')}
-                                   onClick={() => selectCompareAlign('width')}>{t.alignWidth}</button>
-                           </div>
+                           <p className="text-[10px] text-gray-500 pl-16">
+                               {compareLayout === 'tb' ? t.autoAlignWidth : t.autoAlignHeight}
+                           </p>
                        </div>
                        
                        <NeoButton 

@@ -89,29 +89,33 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
   return (
     <div className={`bg-white border-2 border-black shadow-neo flex flex-col h-full hover:-translate-y-1 transition-transform duration-200 relative group ${isPending ? 'opacity-75 bg-gray-50 border-dashed' : ''}`}>
       
-      {/* Header / Meta */}
-      <div className="p-2 md:p-3 border-b-2 border-black flex justify-between items-center bg-gray-50 h-10 md:h-16">
-        <div className="flex items-center gap-2">
-           {/* Date with tooltip */}
-           <span 
-             className="text-[10px] md:text-xs font-bold text-gray-600 cursor-help" 
-             title={getFullDate(prompt.date)}
-           >
-             {getRelativeTime(prompt.date)}
-           </span>
-        </div>
-        
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* Pending Status Badge (Visible if Admin can see it) */}
+      {/* 标题行：名称在左，时间紧邻评级左侧，评级固定在最右侧 */}
+      <div className="p-2 md:p-3 border-b-2 border-black flex items-center justify-between gap-2 bg-gray-50 min-h-[44px] md:min-h-[60px]">
+        <h3 className="font-bold text-xs md:text-xl leading-tight line-clamp-2 md:line-clamp-none flex-1 min-w-0">{prompt.title}</h3>
+
+        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+          {/* 待审核 / 官方标记放在时间与评级之前，保证评级始终最靠右 */}
           {isPending && (
              <span className="bg-yellow-300 text-black text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold flex items-center gap-1">
                 <Clock size={10} /> {t.pending}
              </span>
           )}
+          {prompt.isOfficial && (
+            <span className="bg-neo-red text-white text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold rotate-[2deg] shadow-[1px_1px_0px_rgba(0,0,0,1)] md:shadow-[2px_2px_0px_rgba(0,0,0,1)] select-none">
+              {t.official}
+            </span>
+          )}
+          {/* 更新时间（原本在左上角）移到评级左侧 */}
+          <span
+            className="text-[10px] md:text-xs font-bold text-gray-600 cursor-help whitespace-nowrap"
+            title={getFullDate(prompt.date)}
+          >
+            {getRelativeTime(prompt.date)}
+          </span>
 
           {/* Rating Sticker - Responsive Size */}
           {rating > 0 && !isPending && (
-            <div className="flex items-center gap-0.5 md:gap-1 bg-banana-yellow border-2 border-black px-1 py-0.5 md:px-2 md:py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] md:shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] mr-1 md:mr-2 select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
+            <div className="flex items-center gap-0.5 md:gap-1 bg-banana-yellow border-2 border-black px-1 py-0.5 md:px-2 md:py-1.5 shadow-[2px_2px_0px_rgba(0,0,0,1)] md:shadow-[4px_4px_0px_rgba(0,0,0,1)] rotate-[-3deg] select-none transform hover:scale-110 transition-transform duration-200 cursor-default">
               {[...Array(5)].map((_, i) => (
                 <Star 
                   key={i} 
@@ -121,18 +125,11 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
               ))}
             </div>
           )}
-
-          {prompt.isOfficial && (
-            <span className="bg-neo-red text-white text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border-2 border-black font-bold rotate-[2deg] shadow-[1px_1px_0px_rgba(0,0,0,1)] md:shadow-[2px_2px_0px_rgba(0,0,0,1)] select-none">
-              {t.official}
-            </span>
-          )}
         </div>
       </div>
 
       {/* Image / Content Area */}
       <div className="p-2 md:p-4 flex-grow flex flex-col gap-2 md:gap-4">
-        <h3 className="font-bold text-xs md:text-xl leading-tight line-clamp-2 md:line-clamp-none">{prompt.title}</h3>
         
         {prompt.imageUrl && (
           <div 
