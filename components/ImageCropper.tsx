@@ -9,6 +9,8 @@ interface ImageCropperProps {
   canvasWidth?: number;
   canvasHeight?: number;
   aspectClass?: string;
+  /** true = 显示框和导出都跟随上传图片的自然比例，不裁切不拉伸（用于 2 张对比图） */
+  preserveAspect?: boolean;
 }
 
 export interface ImageCropperRef {
@@ -23,42 +25,57 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   onClick,
   canvasWidth = 640,
   canvasHeight = 720,
-  aspectClass = "aspect-[8/9]"
+  aspectClass = "aspect-[8/9]",
+  preserveAspect = false
 }, ref) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [renderTrigger, setRenderTrigger] = useState(0); // Force re-render for layout
+  const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 导出尺寸：保留原图比例时按长边 1280 等比缩放；否则沿用固定画布尺寸
+  const getExportSize = () => {
+    if (preserveAspect && naturalSize && naturalSize.w > 0 && naturalSize.h > 0) {
+      const ratio = naturalSize.w / naturalSize.h;
+      const MAX_EDGE = 1280;
+      const w = ratio >= 1 ? MAX_EDGE : Math.max(1, Math.round(MAX_EDGE * ratio));
+      const h = ratio >= 1 ? Math.max(1, Math.round(MAX_EDGE / ratio)) : MAX_EDGE;
+      return { width: w, height: h };
+    }
+    return { width: canvasWidth, height: canvasHeight };
+  };
+
   useImperativeHandle(ref, () => ({
     getResult: async () => {
       if (!imageSrc || !imgRef.current) return null;
       
+      const { width: outW, height: outH } = getExportSize();
       const canvas = document.createElement('canvas');
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
+      canvas.width = outW;
+      canvas.height = outH;
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
       // Fill background
       ctx.fillStyle = '#f3f4f6';
-      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+      ctx.fillRect(0, 0, outW, outH);
 
       const img = imgRef.current;
       
       // Calculate draw dimensions
       const imgRatio = img.naturalWidth / img.naturalHeight;
-      const canvasRatio = canvasWidth / canvasHeight;
+      const canvasRatio = outW / outH;
       
       try {
           ctx.save();
           // Move to center of canvas
-          ctx.translate(canvasWidth / 2, canvasHeight / 2);
+          ctx.translate(outW / 2, outH / 2);
           // Apply user transform
           ctx.translate(position.x, position.y);
           ctx.scale(scale, scale);
@@ -66,11 +83,11 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
           let baseW, baseH;
           if (imgRatio > canvasRatio) {
             // Image is wider, fit height
-            baseH = canvasHeight;
+            baseH = outH;
             baseW = baseH * imgRatio;
           } else {
             // Image is taller, fit width
-            baseW = canvasWidth;
+            baseW = outW;
             baseH = baseW / imgRatio;
           }
           
@@ -90,6 +107,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
 
   const handleNewImage = (src: string) => {
       setImageSrc(src);
+      setNaturalSize(null); // 等 onLoad 拿到新图的自然宽高
       setScale(1);
       setPosition({ x: 0, y: 0 });
       if (onImageChange) onImageChange(true);
@@ -135,13 +153,15 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
     (containerRef.current as any).lastMouseX = e.clientX;
     (containerRef.current as any).lastMouseY = e.clientY;
 
-    // Scale factor: canvasWidth / renderedWidth
+    // Scale factor: export canvas size / rendered box size
     // If the box is 300px wide but represents 1280px canvas, 1px mouse move = 4.2px canvas move
-    const ratio = canvasWidth / bounds.width;
+    const { width: outW, height: outH } = getExportSize();
+    const ratioX = outW / bounds.width;
+    const ratioY = outH / bounds.height;
     
     setPosition(prev => ({
-        x: prev.x + (dx * ratio),
-        y: prev.y + (dy * ratio)
+        x: prev.x + (dx * ratioX),
+        y: prev.y + (dy * ratioY)
     }));
   };
 
@@ -164,16 +184,19 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
       // If bounds are 0 (hidden/animating), hide image to prevent jumping
       if (!bounds.width || !bounds.height) return { opacity: 0 };
       
-      const ratio = bounds.width / canvasWidth; 
+      const { width: outW, height: outH } = getExportSize();
+      const ratioX = bounds.width / outW;
+      const ratioY = bounds.height / outH;
       
       return {
-          transform: `translate(-50%, -50%) translate(${position.x * ratio}px, ${position.y * ratio}px) scale(${scale})`,
+          transform: `translate(-50%, -50%) translate(${position.x * ratioX}px, ${position.y * ratioY}px) scale(${scale})`,
           left: '50%',
           top: '50%',
           position: 'absolute' as 'absolute',
-          minWidth: '100%',
-          minHeight: '100%',
-          objectFit: 'cover' as 'cover',
+          width: '100%',
+          height: '100%',
+          // 保留原图比例时容器比例已与图片一致，contain 保证不裁切；固定画布模式仍用 cover
+          objectFit: preserveAspect ? 'contain' as 'contain' : 'cover' as 'cover',
           cursor: isDragging ? 'grabbing' : 'grab',
           userSelect: 'none' as 'none',
           opacity: 1
@@ -199,7 +222,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
             <span className={`text-[10px] font-bold uppercase ${isActive ? 'text-black' : 'text-gray-500'}`}>{label}</span>
             {imageSrc && (
                 <button 
-                  onClick={(e) => { e.stopPropagation(); setImageSrc(null); if (onImageChange) onImageChange(false); }}
+                  onClick={(e) => { e.stopPropagation(); setImageSrc(null); setNaturalSize(null); if (onImageChange) onImageChange(false); }}
                   className="text-xs flex items-center gap-1 text-red-500 hover:text-white hover:bg-red-500 px-1 rounded"
                 >
                     <X size={12}/>
@@ -210,7 +233,8 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
         <div 
             ref={containerRef}
             tabIndex={0}
-            className={`w-full ${aspectClass} border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            className={`w-full ${preserveAspect && naturalSize ? '' : aspectClass} border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            style={preserveAspect && naturalSize ? { aspectRatio: `${naturalSize.w} / ${naturalSize.h}` } : undefined}
             onClick={(e) => { 
                 if(onClick) onClick();
                 if(!imageSrc) fileInputRef.current?.click();
@@ -245,7 +269,13 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                         // Removed crossOrigin to fix preview visibility. 
                         // Note: This may taint canvas if saving without CORS, handled in getResult
                         style={getRenderStyle()}
-                        onLoad={() => setRenderTrigger(prev => prev + 1)}
+                        onLoad={(e) => {
+                            const loaded = e.currentTarget;
+                            if (preserveAspect && loaded.naturalWidth && loaded.naturalHeight) {
+                                setNaturalSize({ w: loaded.naturalWidth, h: loaded.naturalHeight });
+                            }
+                            setRenderTrigger(prev => prev + 1);
+                        }}
                     />
                     
                     {/* Overlay Hints */}

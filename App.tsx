@@ -169,6 +169,8 @@ const App: React.FC = () => {
   const [hasCompareImg1, setHasCompareImg1] = useState(false);
   const [hasCompareImg2, setHasCompareImg2] = useState(false);
   const [activeCompareBox, setActiveCompareBox] = useState<1 | 2 | null>(null);
+  // 合成图的实际宽高比，预览按这个比例显示，不再强制 16:9 裁切
+  const [comparePreviewRatio, setComparePreviewRatio] = useState(16 / 9);
   
   // Cropper Refs
   const crop1Ref = useRef<ImageCropperRef>(null);
@@ -589,15 +591,6 @@ const App: React.FC = () => {
             return;
         }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = 1280;
-        canvas.height = 720;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            setIsGeneratingImage(false);
-            return;
-        }
-
         const loadImage = (src: string) => new Promise<HTMLImageElement>((resolve) => {
             const img = new Image();
             img.onload = () => resolve(img);
@@ -607,24 +600,64 @@ const App: React.FC = () => {
         const img1 = await loadImage(img1Base64);
         const img2 = await loadImage(img2Base64);
 
-        // Draw full 640x720 (8:9) image onto left side
-        ctx.drawImage(img1, 0, 0, 640, 720, 0, 0, 640, 720);
-        // Draw full 640x720 (8:9) image onto right side
-        ctx.drawImage(img2, 0, 0, 640, 720, 640, 0, 640, 720);
+        // 两张图各自保留原比例，等比缩放后放进自适应画布（contain，不裁切不拉伸）
+        const MAX_W = 560;
+        const MAX_H = 720;
+        const GAP = 24;
+        const PAD = 24;
+        const LABEL_H = 40;
+        const fit = (img: HTMLImageElement) => {
+            const scale = Math.min(MAX_W / img.naturalWidth, MAX_H / img.naturalHeight, 1);
+            return {
+                w: Math.max(1, Math.round(img.naturalWidth * scale)),
+                h: Math.max(1, Math.round(img.naturalHeight * scale)),
+            };
+        };
+        const f1 = fit(img1);
+        const f2 = fit(img2);
+        const halfW = Math.max(f1.w, f2.w);
+        const contentH = Math.max(f1.h, f2.h);
 
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect((canvas.width / 2) - 2, 0, 4, canvas.height);
-        
-        ctx.fillStyle = 'rgba(0,0,0,0.6)';
-        ctx.fillRect(10, 10, 80, 24);
-        ctx.fillRect(canvas.width - 90, 10, 80, 24);
-        
-        ctx.font = 'bold 14px sans-serif';
+        const canvas = document.createElement('canvas');
+        canvas.width = PAD * 2 + halfW * 2 + GAP;
+        canvas.height = PAD * 2 + LABEL_H + contentH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+            setIsGeneratingImage(false);
+            return;
+        }
+
         ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.fillText('BEFORE', 50, 27);
-        ctx.fillText('AFTER', canvas.width - 50, 27);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        const halves = [
+            { img: img1, size: f1, index: 0, label: 'BEFORE' },
+            { img: img2, size: f2, index: 1, label: 'AFTER' },
+        ];
+        for (const half of halves) {
+            const left = PAD + half.index * (halfW + GAP);
+            const centerX = left + halfW / 2;
+            const x = left + (halfW - half.size.w) / 2;
+            const y = PAD + LABEL_H + (contentH - half.size.h) / 2;
+            ctx.drawImage(half.img, x, y, half.size.w, half.size.h);
+
+            // 标签放在各自一格的正上方，不压住图片内容
+            const chipW = 84;
+            const chipH = 24;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(centerX - chipW / 2, PAD + (LABEL_H - chipH) / 2, chipW, chipH);
+            ctx.font = 'bold 13px sans-serif';
+            ctx.fillStyle = '#ffffff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(half.label, centerX, PAD + LABEL_H / 2);
+        }
+
+        // 中间分隔线只画在图片内容区，不穿过标签
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(PAD + halfW + GAP / 2 - 1, PAD + LABEL_H, 2, contentH);
+
+        setComparePreviewRatio(canvas.width / canvas.height);
         setEditFormImage(canvas.toDataURL('image/jpeg', 0.9));
       } catch (e) {
           console.error("Gen fail", e);
@@ -1084,7 +1117,8 @@ const App: React.FC = () => {
                                   onImageChange={setHasCompareImg1}
                                   isActive={activeCompareBox === 1}
                                   onClick={() => setActiveCompareBox(1)}
-                                  // 8:9 config (default)
+                                  // 上传图是什么比例就按什么比例显示/导出，不裁切
+                                  preserveAspect={true}
                                />
                            </div>
                            <div className="flex-1">
@@ -1094,7 +1128,8 @@ const App: React.FC = () => {
                                   onImageChange={setHasCompareImg2}
                                   isActive={activeCompareBox === 2}
                                   onClick={() => setActiveCompareBox(2)}
-                                  // 8:9 config (default)
+                                  // 上传图是什么比例就按什么比例显示/导出，不裁切
+                                  preserveAspect={true}
                                />
                            </div>
                        </div>
@@ -1115,12 +1150,12 @@ const App: React.FC = () => {
                {/* Only show preview for Compare mode, as Single mode *is* the preview */}
                {imageMode === 'compare' && (
                    editFormImage ? (
-                     <div className="mt-2 w-full aspect-video border-2 border-black bg-gray-100 overflow-hidden relative">
-                        <img src={editFormImage} alt="Preview" className="w-full h-full object-cover" />
+                     <div className="mt-2 w-full border-2 border-black bg-gray-100 overflow-hidden relative" style={{ aspectRatio: String(comparePreviewRatio) }}>
+                        <img src={editFormImage} alt="Preview" className="w-full h-full object-contain" />
                         <span className="absolute bottom-0 right-0 bg-black text-white text-xs px-1">{t.preview}</span>
                      </div>
                    ) : (
-                     <div className="mt-2 w-full aspect-video border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm">
+                     <div className="mt-2 w-full border-2 border-black border-dashed bg-gray-50 flex items-center justify-center text-gray-400 text-sm" style={{ aspectRatio: String(comparePreviewRatio) }}>
                         No Comparison Generated
                      </div>
                    )
