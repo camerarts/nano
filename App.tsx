@@ -645,41 +645,28 @@ const App: React.FC = () => {
         // 无论哪种排列/对齐，都只做等比缩放，绝不裁切或拉伸原图
         const MAX_W = 560;
         const MAX_H = 720;
-        const GAP = 24;
-        const PAD = 24;
-        const LABEL_H = 40;
+        const GAP = 6;   // 两图之间只留一条细白缝（参考图样式）
+        const PAD = 0;   // 四周贴合图片边缘，不留白边
         const n1 = { w: img1.naturalWidth || 1, h: img1.naturalHeight || 1 };
         const n2 = { w: img2.naturalWidth || 1, h: img2.naturalHeight || 1 };
 
         type Placed = {
             img: HTMLImageElement;
             x: number; y: number; w: number; h: number;
-            labelX: number; labelY: number; label: string;
+            label: string;
+            labelSide: 'left' | 'right'; // BEFORE 贴图片左上，AFTER 贴图片右上
         };
         let placed: Placed[] = [];
         let canvasW = 0;
         let canvasH = 0;
         let divider: { x: number; y: number; w: number; h: number } | null = null;
 
-        if (compareLayout === 'lr' && compareAlign === 'height') {
-            // 左右 + 高度对齐：两图等高，宽度各按原比例
-            const targetH = Math.max(1, Math.floor(Math.min(
-                MAX_H, n1.h, n2.h,
-                MAX_W * n1.h / n1.w,
-                MAX_W * n2.h / n2.w,
-            )));
-            const w1 = Math.max(1, Math.round(n1.w * targetH / n1.h));
-            const w2 = Math.max(1, Math.round(n2.w * targetH / n2.h));
-            canvasW = PAD * 2 + w1 + GAP + w2;
-            canvasH = PAD * 2 + LABEL_H + targetH;
-            const y = PAD + LABEL_H;
-            const x2 = PAD + w1 + GAP;
-            placed = [
-                { img: img1, x: PAD, y, w: w1, h: targetH, labelX: PAD + w1 / 2, labelY: PAD + LABEL_H / 2, label: 'BEFORE' },
-                { img: img2, x: x2, y, w: w2, h: targetH, labelX: x2 + w2 / 2, labelY: PAD + LABEL_H / 2, label: 'AFTER' },
-            ];
-            divider = { x: PAD + w1 + GAP / 2 - 1, y, w: 2, h: targetH };
-        } else if (compareLayout === 'tb' && compareAlign === 'width') {
+        const fit = (n: { w: number; h: number }) => {
+            const scale = Math.min(MAX_W / n.w, MAX_H / n.h, 1);
+            return { w: Math.max(1, Math.round(n.w * scale)), h: Math.max(1, Math.round(n.h * scale)) };
+        };
+
+        if (compareLayout === 'tb' && compareAlign === 'width') {
             // 上下 + 宽度对齐：两图等宽，高度各按原比例
             const targetW = Math.max(1, Math.floor(Math.min(
                 MAX_W, n1.w, n2.w,
@@ -688,33 +675,46 @@ const App: React.FC = () => {
             )));
             const h1 = Math.max(1, Math.round(n1.h * targetW / n1.w));
             const h2 = Math.max(1, Math.round(n2.h * targetW / n2.w));
-            const y1 = PAD + LABEL_H;
-            const y2 = y1 + h1 + GAP + LABEL_H;
+            const y1 = PAD;
+            const y2 = y1 + h1 + GAP;
             canvasW = PAD * 2 + targetW;
-            canvasH = PAD * 2 + LABEL_H * 2 + GAP + h1 + h2;
+            canvasH = PAD * 2 + GAP + h1 + h2;
             placed = [
-                { img: img1, x: PAD, y: y1, w: targetW, h: h1, labelX: PAD + targetW / 2, labelY: PAD + LABEL_H / 2, label: 'BEFORE' },
-                { img: img2, x: PAD, y: y2, w: targetW, h: h2, labelX: PAD + targetW / 2, labelY: y1 + h1 + GAP + LABEL_H / 2, label: 'AFTER' },
+                { img: img1, x: PAD, y: y1, w: targetW, h: h1, label: 'BEFORE', labelSide: 'left' },
+                { img: img2, x: PAD, y: y2, w: targetW, h: h2, label: 'AFTER', labelSide: 'right' },
             ];
             divider = { x: PAD, y: y1 + h1 + GAP / 2 - 1, w: targetW, h: 2 };
-        } else {
-            // 未选择排列/对齐：沿用默认——各自等比 contain 后在等大格子里居中
-            const fit = (n: { w: number; h: number }) => {
-                const scale = Math.min(MAX_W / n.w, MAX_H / n.h, 1);
-                return { w: Math.max(1, Math.round(n.w * scale)), h: Math.max(1, Math.round(n.h * scale)) };
-            };
+        } else if (compareLayout === 'tb') {
+            // 上下但未选对齐：各自等比缩放后堆叠、水平居中
             const f1 = fit(n1);
             const f2 = fit(n2);
-            const halfW = Math.max(f1.w, f2.w);
-            const contentH = Math.max(f1.h, f2.h);
-            canvasW = PAD * 2 + halfW * 2 + GAP;
-            canvasH = PAD * 2 + LABEL_H + contentH;
-            const x2 = PAD + halfW + GAP;
+            const stackW = Math.max(f1.w, f2.w);
+            const y1 = PAD;
+            const y2 = PAD + f1.h + GAP;
+            canvasW = PAD * 2 + stackW;
+            canvasH = PAD * 2 + GAP + f1.h + f2.h;
             placed = [
-                { img: img1, x: PAD + (halfW - f1.w) / 2, y: PAD + LABEL_H + (contentH - f1.h) / 2, w: f1.w, h: f1.h, labelX: PAD + halfW / 2, labelY: PAD + LABEL_H / 2, label: 'BEFORE' },
-                { img: img2, x: x2 + (halfW - f2.w) / 2, y: PAD + LABEL_H + (contentH - f2.h) / 2, w: f2.w, h: f2.h, labelX: x2 + halfW / 2, labelY: PAD + LABEL_H / 2, label: 'AFTER' },
+                { img: img1, x: PAD + (stackW - f1.w) / 2, y: y1, w: f1.w, h: f1.h, label: 'BEFORE', labelSide: 'left' },
+                { img: img2, x: PAD + (stackW - f2.w) / 2, y: y2, w: f2.w, h: f2.h, label: 'AFTER', labelSide: 'right' },
             ];
-            divider = { x: PAD + halfW + GAP / 2 - 1, y: PAD + LABEL_H, w: 2, h: contentH };
+            divider = { x: PAD, y: y1 + f1.h + GAP / 2 - 1, w: stackW, h: 2 };
+        } else {
+            // 默认 / 左右 / 高度对齐：两图等高并排，贴满画布高度（参考图样式，四周无空白）
+            const targetH = Math.max(1, Math.floor(Math.min(
+                MAX_H, n1.h, n2.h,
+                MAX_W * n1.h / n1.w,
+                MAX_W * n2.h / n2.w,
+            )));
+            const w1 = Math.max(1, Math.round(n1.w * targetH / n1.h));
+            const w2 = Math.max(1, Math.round(n2.w * targetH / n2.h));
+            canvasW = PAD * 2 + w1 + GAP + w2;
+            canvasH = PAD * 2 + targetH;
+            const x2 = PAD + w1 + GAP;
+            placed = [
+                { img: img1, x: PAD, y: PAD, w: w1, h: targetH, label: 'BEFORE', labelSide: 'left' },
+                { img: img2, x: x2, y: PAD, w: w2, h: targetH, label: 'AFTER', labelSide: 'right' },
+            ];
+            divider = { x: PAD + w1 + GAP / 2 - 1, y: PAD, w: 2, h: targetH };
         }
 
         const canvas = document.createElement('canvas');
@@ -731,20 +731,26 @@ const App: React.FC = () => {
 
         for (const item of placed) {
             ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
-            // 标签放在各自图片正上方，不压住内容
-            const chipW = 84;
-            const chipH = 24;
-            ctx.fillStyle = 'rgba(0,0,0,0.6)';
-            ctx.fillRect(item.labelX - chipW / 2, item.labelY - chipH / 2, chipW, chipH);
-            ctx.font = 'bold 13px sans-serif';
+            // 标签压在图片内部：BEFORE 左上、AFTER 右上，绝不落在图片外
+            const inset = Math.max(2, Math.min(4, Math.floor(Math.min(item.w, item.h) / 10)));
+            const chipW = Math.max(4, Math.min(84, item.w - inset * 2));
+            const chipH = Math.max(4, Math.min(24, item.h - inset * 2));
+            const chipX = item.labelSide === 'left'
+                ? item.x + inset
+                : item.x + item.w - inset - chipW;
+            const chipY = item.y + inset;
+            ctx.fillStyle = 'rgba(0,0,0,0.65)';
+            ctx.fillRect(chipX, chipY, chipW, chipH);
+            ctx.font = `bold ${chipH >= 22 ? 13 : 10}px sans-serif`;
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(item.label, item.labelX, item.labelY);
+            ctx.fillText(item.label, chipX + chipW / 2, chipY + chipH / 2, chipW - 4);
         }
 
         if (divider) {
-            ctx.fillStyle = '#111827';
+            // 中间只保留细白缝，不加深色分割线（与参考图一致）
+            ctx.fillStyle = '#ffffff';
             ctx.fillRect(divider.x, divider.y, divider.w, divider.h);
         }
 
