@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { Upload, X, Move, ZoomIn } from 'lucide-react';
+import { Upload, X, Move, ZoomIn, RotateCcw } from 'lucide-react';
 
 interface ImageCropperProps {
   label: string;
@@ -167,6 +167,14 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
 
   const handleMouseUp = () => setIsDragging(false);
 
+  // 双击已上传图片：还原到原始缩放与位置
+  const handleDoubleClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!imageSrc) return;
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+  };
+
   const handleWheel = (e: React.WheelEvent) => {
     if (!imageSrc) return;
     e.preventDefault();
@@ -269,6 +277,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                         // Removed crossOrigin to fix preview visibility. 
                         // Note: This may taint canvas if saving without CORS, handled in getResult
                         style={getRenderStyle()}
+                        onDoubleClick={handleDoubleClick}
                         onLoad={(e) => {
                             const loaded = e.currentTarget;
                             if (preserveAspect && loaded.naturalWidth && loaded.naturalHeight) {
@@ -282,6 +291,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                     <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/cropper:opacity-100 transition-opacity pointer-events-none flex gap-2">
                          <span className="flex items-center gap-1"><Move size={10}/> Drag</span>
                          <span className="flex items-center gap-1"><ZoomIn size={10}/> Scroll</span>
+                         <span className="flex items-center gap-1"><RotateCcw size={10}/> 双击还原</span>
                     </div>
                 </>
             )}

@@ -1266,7 +1266,13 @@ const App: React.FC = () => {
                {imageMode === 'compare' && (
                    editFormImage ? (
                      <div className="mt-2 w-full border-2 border-black bg-gray-100 overflow-hidden relative" style={{ aspectRatio: String(comparePreviewRatio) }}>
-                        <img src={editFormImage} alt="Preview" className="w-full h-full object-contain" />
+                        <img
+                           src={editFormImage}
+                           alt="Preview"
+                           title="双击放大查看"
+                           onDoubleClick={() => setLightboxUrl(editFormImage)}
+                           className="w-full h-full object-contain cursor-zoom-in"
+                        />
                         <span className="absolute bottom-0 right-0 bg-black text-white text-xs px-1">{t.preview}</span>
                      </div>
                    ) : (
