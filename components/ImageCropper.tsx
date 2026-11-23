@@ -9,8 +9,10 @@ interface ImageCropperProps {
   canvasWidth?: number;
   canvasHeight?: number;
   aspectClass?: string;
-  /** true = 显示框和导出都跟随上传图片的自然比例，不裁切不拉伸（用于 2 张对比图） */
+  /** true = 显示框和导出都跟随上传图片的自然比例，不裁切不拉伸 */
   preserveAspect?: boolean;
+  /** 保留比例时，显示框允许的最大高度（px）；超出则等比缩小显示，不影响导出比例 */
+  maxPreviewHeight?: number;
 }
 
 export interface ImageCropperRef {
@@ -26,7 +28,8 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   canvasWidth = 640,
   canvasHeight = 720,
   aspectClass = "aspect-[8/9]",
-  preserveAspect = false
+  preserveAspect = false,
+  maxPreviewHeight
 }, ref) => {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
@@ -221,6 +224,28 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
     return () => observer.disconnect();
   }, []);
 
+  // 显示框尺寸：保留原图比例时按图片自然宽高比；高度超过上限则等比缩小并居中（导出仍按原比例）
+  const getBoxStyle = (): React.CSSProperties | undefined => {
+      if (!preserveAspect || !naturalSize) return undefined;
+      const ratio = naturalSize.w / naturalSize.h;
+      const base: React.CSSProperties = { aspectRatio: `${naturalSize.w} / ${naturalSize.h}` };
+      if (!maxPreviewHeight) return base;
+
+      // 用父容器的宽度算可用空间，避免被自己缩小后的宽度影响导致来回抖动
+      const parentW = containerRef.current?.parentElement?.getBoundingClientRect().width || 0;
+      if (parentW > 0 && parentW / ratio > maxPreviewHeight) {
+          const h = maxPreviewHeight;
+          return {
+              ...base,
+              width: Math.max(1, Math.round(h * ratio)),
+              height: h,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+          };
+      }
+      return base;
+  };
+
   return (
     <div className="flex flex-col gap-1 w-full group/cropper">
         <div 
@@ -242,7 +267,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
             ref={containerRef}
             tabIndex={0}
             className={`w-full ${preserveAspect && naturalSize ? '' : aspectClass} border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
-            style={preserveAspect && naturalSize ? { aspectRatio: `${naturalSize.w} / ${naturalSize.h}` } : undefined}
+            style={getBoxStyle()}
             onClick={(e) => { 
                 if(onClick) onClick();
                 if(!imageSrc) fileInputRef.current?.click();

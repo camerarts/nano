@@ -1170,10 +1170,12 @@ const App: React.FC = () => {
                         ref={singleCropRef} 
                         label={t.lblPreview} 
                         isActive={true}
-                        // 16:9 config
+                        // 单图也保留上传原图比例：显示框与导出画布都跟随图片自然宽高比
+                        preserveAspect={true}
+                        // 竖版长图显示框最高 420px，等比缩小显示，不影响导出比例
+                        maxPreviewHeight={420}
+                        // 未上传时仍用 16:9 作为占位框样式
                         aspectClass="aspect-video"
-                        canvasWidth={1280}
-                        canvasHeight={720}
                     />
                 </div>
                )}
