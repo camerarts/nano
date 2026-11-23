@@ -136,13 +136,21 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
         
         {prompt.imageUrl && (
           <div 
-            className="aspect-video w-full border-2 border-black overflow-hidden bg-gray-100 relative group cursor-zoom-in shadow-sm"
+            className="aspect-[4/3] w-full border-2 border-black overflow-hidden bg-gray-100 relative group cursor-zoom-in shadow-sm"
             onClick={() => onImageClick && onImageClick(prompt.imageUrl!)}
           >
+             {/* 背景：同一张图模糊铺满，填充完整显示后留下的两侧/上下空白 */}
+             <img
+               src={prompt.imageUrl}
+               alt=""
+               aria-hidden="true"
+               className="absolute inset-0 w-full h-full object-cover blur-xl scale-110 opacity-40 pointer-events-none select-none"
+             />
+             {/* 前景：object-contain 完整显示整张图，任何比例都不裁切 */}
              <img 
                src={prompt.imageUrl} 
                alt={prompt.title} 
-               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+               className="relative w-full h-full object-contain" 
              />
              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
              </div>
