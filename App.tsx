@@ -822,6 +822,26 @@ const App: React.FC = () => {
     return () => document.removeEventListener('paste', handlePaste);
   }, [modalType, imageMode, activeCompareBox, lang]);
 
+  // 弹窗打开时，防止图片被拖到上传框以外的地方时浏览器直接打开图片、把正在编辑的内容顶掉
+  useEffect(() => {
+    if (modalType !== 'EDIT' && modalType !== 'SUBMIT') return;
+
+    const isFileDrag = (e: DragEvent) => {
+      const types = e.dataTransfer?.types;
+      return !!types && Array.from(types).includes('Files');
+    };
+    const prevent = (e: DragEvent) => {
+      if (isFileDrag(e)) e.preventDefault();
+    };
+
+    document.addEventListener('dragover', prevent);
+    document.addEventListener('drop', prevent);
+    return () => {
+      document.removeEventListener('dragover', prevent);
+      document.removeEventListener('drop', prevent);
+    };
+  }, [modalType]);
+
 
   return (
     <div className="min-h-screen pb-20 font-sans">

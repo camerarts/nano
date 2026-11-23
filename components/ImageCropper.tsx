@@ -37,6 +37,8 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   const [isDragging, setIsDragging] = useState(false);
   const [renderTrigger, setRenderTrigger] = useState(0); // Force re-render for layout
   const [naturalSize, setNaturalSize] = useState<{ w: number; h: number } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragDepth = useRef(0);
   
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -123,6 +125,71 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
       reader.onload = (evt) => handleNewImage(evt.target?.result as string);
       reader.readAsDataURL(file);
     }
+  };
+
+  // --- Drag & Drop ---
+  // 只接管「拖文件 / 拖图片链接」，拖动纯文本时不亮起上传提示
+  const hasDraggedPayload = (e: React.DragEvent) => {
+    const types = e.dataTransfer?.types;
+    if (!types) return false;
+    const list = Array.from(types as unknown as string[]);
+    return list.includes('Files') || list.includes('text/uri-list');
+  };
+
+  const isImageLikeUrl = (raw: string) => {
+    const url = raw.trim().split('\n')[0];
+    if (!url) return null;
+    const isImageUrl = /^data:image\//i.test(url) || /^https?:\/\/\S+\.(png|jpe?g|webp|gif|bmp|svg)(\?\S*)?$/i.test(url);
+    return isImageUrl ? url : null;
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    if (!hasDraggedPayload(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current += 1;
+    setIsDragOver(true);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    if (!hasDraggedPayload(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!hasDraggedPayload(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragDepth.current = 0;
+    setIsDragOver(false);
+    if (onClick) onClick();
+
+    const dt = e.dataTransfer;
+    if (!dt) return;
+
+    // 1) 本地图片文件（最常见）
+    const files: File[] = dt.files ? Array.from(dt.files) : [];
+    const file = files.find(f => f.type.startsWith('image/'));
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (evt) => handleNewImage(evt.target?.result as string);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    // 2) 从别的网页拖过来的图片：data URL 或图片地址
+    const raw = dt.getData('text/uri-list') || dt.getData('text/plain');
+    const url = raw ? isImageLikeUrl(raw) : null;
+    if (url) handleNewImage(url);
   };
 
   // --- Interaction Handlers ---
@@ -266,12 +333,16 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
         <div 
             ref={containerRef}
             tabIndex={0}
-            className={`w-full ${preserveAspect && naturalSize ? '' : aspectClass} border-2 border-black border-dashed relative overflow-hidden bg-gray-50 outline-none transition-all ${isActive ? 'border-green-500 ring-2 ring-green-200' : 'focus:border-banana-yellow'} ${!imageSrc ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            className={`w-full ${preserveAspect && naturalSize ? '' : aspectClass} border-2 border-dashed relative overflow-hidden outline-none transition-all ${isDragOver ? 'border-solid border-blue-500 bg-blue-50 ring-2 ring-blue-300' : isActive ? 'border-green-500 ring-2 ring-green-200 bg-gray-50' : 'border-black bg-gray-50 focus:border-banana-yellow'} ${!imageSrc && !isDragOver ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
             style={getBoxStyle()}
             onClick={(e) => { 
                 if(onClick) onClick();
                 if(!imageSrc) fileInputRef.current?.click();
             }}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -291,6 +362,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                     <Upload size={24} className={`mb-2 ${isActive ? 'text-green-500' : ''}`}/>
                     <span className={`text-xs font-bold ${isActive ? 'text-green-600' : ''}`}>Click to Upload</span>
                     <span className="text-[10px]">or Paste (Ctrl+V)</span>
+                    <span className="text-[10px]">or Drop image here</span>
                 </div>
             ) : (
                 <>
@@ -319,6 +391,15 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                          <span className="flex items-center gap-1"><RotateCcw size={10}/> 双击还原</span>
                     </div>
                 </>
+            )}
+
+            {/* 拖拽悬停提示：松手即替换当前图片 */}
+            {isDragOver && (
+                <div className="absolute inset-0 z-20 bg-blue-500/85 text-white flex flex-col items-center justify-center gap-1 pointer-events-none">
+                    <Upload size={22} />
+                    <span className="text-xs font-bold">松手即上传</span>
+                    <span className="text-[10px] opacity-80">Drop to upload</span>
+                </div>
             )}
         </div>
     </div>
