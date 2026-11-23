@@ -616,8 +616,8 @@ const App: React.FC = () => {
       setIsGeneratingImage(true);
       
       try {
-        const img1Base64 = await crop1Ref.current.getResult();
-        const img2Base64 = await crop2Ref.current.getResult();
+        const img1Base64 = await crop1Ref.current.getResult('png');
+        const img2Base64 = await crop2Ref.current.getResult('png');
         
         if (!img1Base64 || !img2Base64) {
             setIsGeneratingImage(false);
@@ -633,9 +633,7 @@ const App: React.FC = () => {
         const img1 = await loadImage(img1Base64);
         const img2 = await loadImage(img2Base64);
 
-        // 无论哪种排列/对齐，都只做等比缩放，绝不裁切或拉伸原图
-        const MAX_W = 560;
-        const MAX_H = 720;
+        // 按原图分辨率合成，不做任何缩放；只对超大画布做等比保护，避免超出浏览器画布上限
         const GAP = 6;   // 两图之间只留一条细白缝（参考图样式）
         const PAD = 0;   // 四周贴合图片边缘，不留白边
         const n1 = { w: img1.naturalWidth || 1, h: img1.naturalHeight || 1 };
@@ -653,12 +651,8 @@ const App: React.FC = () => {
         let divider: { x: number; y: number; w: number; h: number } | null = null;
 
         if (compareLayout === 'tb') {
-            // 上下排列：后台自动宽度对齐，两图等宽，高度各按原比例
-            const targetW = Math.max(1, Math.floor(Math.min(
-                MAX_W, n1.w, n2.w,
-                MAX_H * n1.w / n1.h,
-                MAX_H * n2.w / n2.h,
-            )));
+            // 上下排列：宽度对齐，取两图中更宽的那张为准，绝不缩小原图
+            const targetW = Math.max(1, n1.w, n2.w);
             const h1 = Math.max(1, Math.round(n1.h * targetW / n1.w));
             const h2 = Math.max(1, Math.round(n2.h * targetW / n2.w));
             const y1 = PAD;
@@ -671,12 +665,8 @@ const App: React.FC = () => {
             ];
             divider = { x: PAD, y: y1 + h1 + GAP / 2 - 1, w: targetW, h: 2 };
         } else {
-            // 默认 / 左右排列：后台自动高度对齐，两图等高并排，贴满画布高度（四周无空白）
-            const targetH = Math.max(1, Math.floor(Math.min(
-                MAX_H, n1.h, n2.h,
-                MAX_W * n1.h / n1.w,
-                MAX_W * n2.h / n2.w,
-            )));
+            // 默认 / 左右排列：高度对齐，取两图中更高的那张为准，绝不缩小原图
+            const targetH = Math.max(1, n1.h, n2.h);
             const w1 = Math.max(1, Math.round(n1.w * targetH / n1.h));
             const w2 = Math.max(1, Math.round(n2.w * targetH / n2.h));
             canvasW = PAD * 2 + w1 + GAP + w2;
@@ -689,6 +679,30 @@ const App: React.FC = () => {
             divider = { x: PAD + w1 + GAP / 2 - 1, y: PAD, w: 2, h: targetH };
         }
 
+        // 极端情况保护：单边 ≤ 8192、总像素 ≤ 1600 万（兼容移动端 Safari 画布上限），超出才整体等比缩小
+        const MAX_SIDE = 8192;
+        const MAX_PIXELS = 16000000;
+        const guard = Math.min(
+            1,
+            MAX_SIDE / Math.max(canvasW, canvasH),
+            Math.sqrt(MAX_PIXELS / (canvasW * canvasH)),
+        );
+        if (guard < 1) {
+            const k = guard;
+            canvasW = Math.max(1, Math.round(canvasW * k));
+            canvasH = Math.max(1, Math.round(canvasH * k));
+            placed = placed.map(p => ({
+                ...p,
+                x: Math.round(p.x * k),
+                y: Math.round(p.y * k),
+                w: Math.max(1, Math.round(p.w * k)),
+                h: Math.max(1, Math.round(p.h * k)),
+            }));
+            divider = divider
+                ? { x: Math.round(divider.x * k), y: Math.round(divider.y * k), w: divider.w, h: divider.h }
+                : null;
+        }
+
         const canvas = document.createElement('canvas');
         canvas.width = canvasW;
         canvas.height = canvasH;
@@ -698,26 +712,35 @@ const App: React.FC = () => {
             return;
         }
 
+        // 高质量缩放（缩小画布时也尽量保住细节）
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         for (const item of placed) {
             ctx.drawImage(item.img, item.x, item.y, item.w, item.h);
             // 标签压在图片内部：BEFORE 左上、AFTER 右上，绝不落在图片外
-            const inset = Math.max(2, Math.min(4, Math.floor(Math.min(item.w, item.h) / 10)));
-            const chipW = Math.max(4, Math.min(84, item.w - inset * 2));
-            const chipH = Math.max(4, Math.min(24, item.h - inset * 2));
+            // 尺寸随图片分辨率放大，高清图上也清晰可读
+            const k = Math.max(1, item.h / 280);
+            const fontPx = Math.min(96, Math.max(10, Math.round(13 * k)));
+            const inset = Math.max(2, Math.round(4 * k));
+            const chipH = Math.round(fontPx * 1.85);
+            const chipW = Math.min(
+                Math.max(24, item.w - inset * 2),
+                Math.round(fontPx * 6.2),
+            );
             const chipX = item.labelSide === 'left'
                 ? item.x + inset
                 : item.x + item.w - inset - chipW;
             const chipY = item.y + inset;
             ctx.fillStyle = 'rgba(0,0,0,0.65)';
             ctx.fillRect(chipX, chipY, chipW, chipH);
-            ctx.font = `bold ${chipH >= 22 ? 13 : 10}px sans-serif`;
+            ctx.font = `bold ${fontPx}px sans-serif`;
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(item.label, chipX + chipW / 2, chipY + chipH / 2, chipW - 4);
+            ctx.fillText(item.label, chipX + chipW / 2, chipY + chipH / 2, chipW - fontPx * 0.3);
         }
 
         if (divider) {
@@ -727,7 +750,8 @@ const App: React.FC = () => {
         }
 
         setComparePreviewRatio(canvas.width / canvas.height);
-        setEditFormImage(canvas.toDataURL('image/jpeg', 0.9));
+        // 原分辨率输出，JPEG 0.95 高质量，不再降到缩略图尺寸
+        setEditFormImage(canvas.toDataURL('image/jpeg', 0.95));
       } catch (e) {
           console.error("Gen fail", e);
           alert("Error generating comparison");

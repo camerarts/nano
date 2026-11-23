@@ -16,7 +16,8 @@ interface ImageCropperProps {
 }
 
 export interface ImageCropperRef {
-  getResult: () => Promise<string | null>;
+  /** format: jpeg(默认，高质量 0.95) / png(无损，用于再合成时避免二次损失) */
+  getResult: (format?: 'jpeg' | 'png') => Promise<string | null>;
   setImage: (dataUrl: string) => void;
 }
 
@@ -44,20 +45,23 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 导出尺寸：保留原图比例时按长边 1280 等比缩放；否则沿用固定画布尺寸
+  // 导出尺寸：保留原图比例时按原图分辨率导出（不缩放）；否则沿用固定画布尺寸
   const getExportSize = () => {
     if (preserveAspect && naturalSize && naturalSize.w > 0 && naturalSize.h > 0) {
-      const ratio = naturalSize.w / naturalSize.h;
-      const MAX_EDGE = 1280;
-      const w = ratio >= 1 ? MAX_EDGE : Math.max(1, Math.round(MAX_EDGE * ratio));
-      const h = ratio >= 1 ? Math.max(1, Math.round(MAX_EDGE / ratio)) : MAX_EDGE;
-      return { width: w, height: h };
+      // 原图多大就导出多大，只做极端尺寸保护（长边超过 4096 时等比缩小，避免超出浏览器画布上限）
+      const MAX_EDGE = 4096;
+      const longest = Math.max(naturalSize.w, naturalSize.h);
+      const k = longest > MAX_EDGE ? MAX_EDGE / longest : 1;
+      return {
+        width: Math.max(1, Math.round(naturalSize.w * k)),
+        height: Math.max(1, Math.round(naturalSize.h * k)),
+      };
     }
     return { width: canvasWidth, height: canvasHeight };
   };
 
   useImperativeHandle(ref, () => ({
-    getResult: async () => {
+    getResult: async (format: 'jpeg' | 'png' = 'jpeg') => {
       if (!imageSrc || !imgRef.current) return null;
       
       const { width: outW, height: outH } = getExportSize();
@@ -99,7 +103,10 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
           ctx.drawImage(img, -baseW / 2, -baseH / 2, baseW, baseH);
           ctx.restore();
 
-          return canvas.toDataURL('image/jpeg', 0.9);
+          // PNG 无损（中间产物再合成用），JPEG 用 0.95 高质量，尽量不损失细节
+          return format === 'png'
+              ? canvas.toDataURL('image/png')
+              : canvas.toDataURL('image/jpeg', 0.95);
       } catch (e) {
           console.warn("Canvas tainted, cannot crop/export image (CORS). Returning null.", e);
           return null;
