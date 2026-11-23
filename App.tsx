@@ -4,6 +4,7 @@ import { Prompt, User, ModalType } from './types';
 import { downloadImage } from './services/downloadImage';
 import { NeoButton } from './components/ui/NeoButton';
 import { PromptCard } from './components/PromptCard';
+import MasonryColumns from './components/MasonryColumns';
 import { Modal } from './components/Modal';
 import { Lightbox } from './components/Lightbox';
 import { ImageCropper, ImageCropperRef } from './components/ImageCropper';
@@ -1048,19 +1049,21 @@ const App: React.FC = () => {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-8 items-start">
-            {sortedPrompts.map((prompt) => (
-              <PromptCard 
-                  key={prompt.id} 
-                  prompt={prompt} 
-                  canEdit={!!user} 
-                  onEdit={openEditModal}
-                  onLike={handleLike}
-                  onImageClick={setLightboxUrl}
-                  lang={lang}
-              />
-            ))}
-        </div>
+        {/* 瀑布流：按列排布，卡片在各自列内紧贴上一张，不留空隙；按顺序轮流分配到各列，保持从左到右的阅读顺序 */}
+        <MasonryColumns
+          items={sortedPrompts}
+          renderItem={(prompt: (typeof sortedPrompts)[number]) => (
+            <PromptCard 
+                key={prompt.id} 
+                prompt={prompt} 
+                canEdit={!!user} 
+                onEdit={openEditModal}
+                onLike={handleLike}
+                onImageClick={setLightboxUrl}
+                lang={lang}
+            />
+          )}
+        />
       </main>
 
       {/* --- MODALS --- */}
