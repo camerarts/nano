@@ -1048,7 +1048,7 @@ const App: React.FC = () => {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-8 items-start">
             {sortedPrompts.map((prompt) => (
               <PromptCard 
                   key={prompt.id} 
