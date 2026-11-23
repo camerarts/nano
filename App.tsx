@@ -872,7 +872,7 @@ const App: React.FC = () => {
     <div className="min-h-screen pb-20 font-sans">
       {/* --- HEADER --- */}
       <header className="bg-neo-red border-b-4 border-black sticky top-0 z-40">
-        <div className="container mx-auto px-4 h-20 flex items-center justify-between">
+        <div className="w-full px-4 md:px-8 h-20 flex items-center justify-between">
           <div 
              className="flex flex-col select-none group cursor-pointer"
              onClick={() => window.location.reload()}
@@ -1009,7 +1009,7 @@ const App: React.FC = () => {
       </section>
 
       {/* --- CONTENT GRID --- */}
-      <main className="container mx-auto px-2 md:px-4 -mt-10 relative z-20">
+      <main className="w-full px-2 md:px-8 -mt-10 relative z-20">
         <div className="flex justify-between items-center mb-8 bg-banana-bg flex-wrap gap-4">
            <div className="flex items-center gap-2 md:gap-4">
               <button 
