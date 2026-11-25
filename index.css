@@ -1,0 +1,73 @@
+/* =========================================================
+ * 全站动效 token：一套曲线、三档节奏
+ *  - ease-out：进入/响应（快起慢停，跟手）
+ *  - ease-in：退出（干脆离场）
+ *  - 时长：fast 140ms（按压/颜色/退出）、base 220ms（悬停/切换）、slow 320ms（弹层进入）
+ *  只动 transform / opacity（合成层），不动布局属性，避免重排和掉帧
+ * ========================================================= */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+}
+
+/* ---------- 弹层：遮罩 ---------- */
+.motion-backdrop {
+  animation: motion-fade-in var(--dur-base) var(--ease-out) both;
+}
+.motion-backdrop[data-state='closed'] {
+  animation: motion-fade-out var(--dur-fast) var(--ease-in) both;
+  pointer-events: none;
+}
+
+/* ---------- 弹层：面板（轻微上浮 + 放大） ---------- */
+.motion-panel {
+  animation: motion-panel-in var(--dur-slow) var(--ease-out) both;
+}
+.motion-panel[data-state='closed'] {
+  animation: motion-panel-out var(--dur-fast) var(--ease-in) both;
+}
+
+/* ---------- 内容切换（单图/对比图模式等） ---------- */
+.motion-enter {
+  animation: motion-enter var(--dur-base) var(--ease-out) both;
+}
+
+@keyframes motion-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes motion-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes motion-panel-out {
+  from { opacity: 1; transform: none; }
+  to   { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+@keyframes motion-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* ---------- 悬停才出现的控件：触屏设备没有悬停，直接常显 ---------- */
+@media (hover: none) {
+  .hover-reveal { opacity: 1 !important; }
+}
+
+/* ---------- 尊重系统“减少动态效果” ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* 加载转圈是状态提示，保留但放慢 */
+  .animate-spin {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+  }
+  /* 位移类悬停效果关闭，只保留颜色/阴影反馈 */
+  .motion-lift:hover, .group:hover .motion-lift { transform: none !important; }
+}

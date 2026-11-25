@@ -878,7 +878,7 @@ const App: React.FC = () => {
              onClick={() => window.location.reload()}
              title="Refresh Page"
           >
-             <h1 className="text-3xl md:text-4xl font-black text-white drop-shadow-[3px_3px_0px_rgba(0,0,0,1)] tracking-tighter italic group-hover:-translate-y-1 transition-transform">
+             <h1 className="text-2xl sm:text-3xl md:text-4xl whitespace-nowrap font-black text-white drop-shadow-[3px_3px_0px_rgba(0,0,0,1)] tracking-tighter italic group-hover:-translate-y-1 motion-lift transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]">
                NANO BANANA PRO
              </h1>
              <span className="bg-black text-white text-xs px-2 py-0.5 w-fit font-mono -mt-1 transform -rotate-1 ml-4 border border-white">
@@ -888,7 +888,7 @@ const App: React.FC = () => {
 
           <div className="flex items-center gap-4">
             {user && (
-                 <NeoButton variant="primary" onClick={handleCreateNew} className="flex items-center gap-2 animate-bounce hover:animate-none md:mr-2">
+                 <NeoButton variant="primary" onClick={handleCreateNew} className="flex items-center gap-2 md:mr-2">
                     <Plus size={20} /> <span className="hidden sm:inline">{t.newPrompt}</span>
                  </NeoButton>
             )}
@@ -953,13 +953,13 @@ const App: React.FC = () => {
         <div className="absolute bottom-20 left-20 w-8 h-8 border-2 border-black bg-white transform rotate-45"></div>
 
         <div className="container mx-auto max-w-6xl relative z-10">
-           <div className="bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-8 md:p-14 relative overflow-hidden group hover:translate-x-1 hover:translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-all duration-300">
+           <div className="bg-white border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-8 md:p-14 relative overflow-hidden group hover:translate-x-1 hover:translate-y-1 hover:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] motion-lift transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]">
               <div className="absolute top-0 left-0 w-full h-2 bg-black"></div>
               <div className="absolute bottom-0 left-0 w-full h-2 bg-black"></div>
               <div className="absolute top-0 left-0 h-full w-2 bg-black"></div>
               <div className="absolute top-0 right-0 h-full w-2 bg-black"></div>
-              <Sparkles className="absolute top-6 right-6 text-banana-yellow w-12 h-12 animate-pulse" />
-              <Sparkles className="absolute bottom-6 left-6 text-neo-red w-8 h-8 animate-pulse delay-75" />
+              <Sparkles className="absolute top-6 right-6 text-banana-yellow w-12 h-12" />
+              <Sparkles className="absolute bottom-6 left-6 text-neo-red w-8 h-8" />
 
               <div className="flex flex-col items-center justify-center text-center">
                  <h1 className="text-5xl md:text-8xl lg:text-9xl font-black italic text-black tracking-tighter leading-none mb-4 drop-shadow-[5px_5px_0px_rgba(255,255,255,1)] select-none scale-y-105">
@@ -998,7 +998,7 @@ const App: React.FC = () => {
                         variant="secondary" 
                         size="sm" 
                         onClick={handlePublicSubmit}
-                        className="!shadow-neo-sm font-bold text-[10px] md:text-sm animate-pulse hover:animate-none whitespace-nowrap"
+                        className="!shadow-neo-sm font-bold text-[10px] md:text-sm whitespace-nowrap"
                     >
                         {t.visitorSubmit}
                     </NeoButton>
@@ -1014,7 +1014,7 @@ const App: React.FC = () => {
            <div className="flex items-center gap-2 md:gap-4">
               <button 
                 onClick={() => handleSort('date')}
-                className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
+                className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]
                   ${sortBy === 'date' 
                     ? 'bg-white shadow-neo scale-100 z-10' 
                     : 'bg-gray-200 text-gray-500 shadow-none hover:bg-gray-100'}
@@ -1026,7 +1026,7 @@ const App: React.FC = () => {
 
               <button 
                 onClick={() => handleSort('rating')}
-                className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-all duration-200
+                className={`text-sm md:text-2xl font-black border-2 border-black px-2 md:px-4 py-2 flex items-center gap-1 md:gap-2 transition-[background-color,color,box-shadow] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]
                   ${sortBy === 'rating' 
                     ? 'bg-white shadow-neo scale-100 z-10' 
                     : 'bg-gray-200 text-gray-500 shadow-none hover:bg-gray-100'}
@@ -1171,7 +1171,7 @@ const App: React.FC = () => {
                         <button 
                           key={star} 
                           onClick={() => setEditFormRating(star)}
-                          className="transition-transform hover:scale-110"
+                          className="transition-transform duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-110 active:scale-95"
                         >
                            <Star 
                              size={24} 
@@ -1212,7 +1212,7 @@ const App: React.FC = () => {
                </div>
 
                {imageMode === 'single' && (
-                <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
+                <div className="flex flex-col gap-2 motion-enter">
                     <ImageCropper 
                         ref={singleCropRef} 
                         label={t.lblPreview} 
@@ -1228,7 +1228,7 @@ const App: React.FC = () => {
                )}
 
                {imageMode === 'compare' && (
-                   <div className="flex flex-col gap-2 animate-in fade-in zoom-in duration-200">
+                   <div className="flex flex-col gap-2 motion-enter">
                        <div className="flex gap-2">
                            <div className="flex-1">
                                <ImageCropper 
@@ -1303,7 +1303,7 @@ const App: React.FC = () => {
                                e.stopPropagation();
                                void downloadImage(editFormImage, `对比图-${Date.now()}.jpg`);
                            }}
-                           className="absolute bottom-2 right-2 z-10 p-1.5 bg-banana-yellow border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all"
+                           className="absolute bottom-2 right-2 z-10 p-1.5 bg-banana-yellow border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] motion-lift transition-[transform,box-shadow] duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]"
                         >
                            <Download size={16} strokeWidth={3} />
                         </button>

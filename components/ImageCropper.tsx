@@ -340,7 +340,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
         <div 
             ref={containerRef}
             tabIndex={0}
-            className={`w-full ${preserveAspect && naturalSize ? '' : aspectClass} border-2 border-dashed relative overflow-hidden outline-none transition-all ${isDragOver ? 'border-solid border-blue-500 bg-blue-50 ring-2 ring-blue-300' : isActive ? 'border-green-500 ring-2 ring-green-200 bg-gray-50' : 'border-black bg-gray-50 focus:border-banana-yellow'} ${!imageSrc && !isDragOver ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
+            className={`w-full ${preserveAspect && naturalSize ? '' : aspectClass} border-2 border-dashed relative overflow-hidden outline-none transition-[border-color,background-color] duration-150 ${isDragOver ? 'border-solid border-blue-500 bg-blue-50 ring-2 ring-blue-300' : isActive ? 'border-green-500 ring-2 ring-green-200 bg-gray-50' : 'border-black bg-gray-50 focus:border-banana-yellow'} ${!imageSrc && !isDragOver ? 'cursor-pointer hover:bg-yellow-50' : ''}`}
             style={getBoxStyle()}
             onClick={(e) => { 
                 if(onClick) onClick();
@@ -392,7 +392,7 @@ export const ImageCropper = forwardRef<ImageCropperRef, ImageCropperProps>(({
                     />
                     
                     {/* Overlay Hints */}
-                    <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover/cropper:opacity-100 transition-opacity pointer-events-none flex gap-2">
+                    <div className="absolute top-2 right-2 bg-black/50 text-white text-[10px] px-2 py-1 rounded hover-reveal opacity-0 group-hover/cropper:opacity-100 transition-opacity duration-200 pointer-events-none flex gap-2">
                          <span className="flex items-center gap-1"><Move size={10}/> Drag</span>
                          <span className="flex items-center gap-1"><ZoomIn size={10}/> Scroll</span>
                          <span className="flex items-center gap-1"><RotateCcw size={10}/> 双击还原</span>

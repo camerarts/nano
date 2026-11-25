@@ -12,7 +12,7 @@ export const NeoButton: React.FC<NeoButtonProps> = ({
   size = 'md',
   ...props 
 }) => {
-  const baseStyles = "border-2 border-black font-bold transition-all active:translate-x-[2px] active:translate-y-[2px] active:shadow-neo-hover disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyles = "border-2 border-black font-bold transition-[transform,box-shadow,background-color] duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-neo-hover disabled:opacity-50 disabled:cursor-not-allowed";
   
   const variants = {
     primary: "bg-banana-yellow text-black shadow-neo hover:bg-yellow-400",

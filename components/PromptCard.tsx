@@ -90,7 +90,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
   const isPending = prompt.status === 'pending';
 
   return (
-    <div className={`bg-white border-2 border-black shadow-neo flex flex-col hover:-translate-y-1 transition-transform duration-200 relative group ${isPending ? 'opacity-75 bg-gray-50 border-dashed' : ''}`}>
+    <div className={`bg-white border-2 border-black shadow-neo flex flex-col hover:-translate-y-1 motion-lift transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] relative group ${isPending ? 'opacity-75 bg-gray-50 border-dashed' : ''}`}>
       
       {/* 标题行：名称在左，时间紧邻评级左侧，评级固定在最右侧 */}
       <div className="p-2 md:p-3 border-b-2 border-black flex items-center justify-between gap-2 bg-gray-50 min-h-[44px] md:min-h-[60px]">
@@ -146,7 +146,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
                loading="lazy"
                className="block w-full h-auto" 
              />
-             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
+             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none">
              </div>
              {/* 鼠标移到图片上时右下角浮出下载按钮；阻止冒泡，避免同时打开灯箱 */}
              <button
@@ -157,7 +157,7 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
                  e.stopPropagation();
                  void downloadImage(prompt.imageUrl!, `${prompt.title}.${getImageExtension(prompt.imageUrl!)}`);
                }}
-               className="absolute bottom-2 right-2 z-10 p-1.5 bg-banana-yellow border-2 border-black shadow-neo-sm opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 active:scale-100"
+               className="absolute bottom-2 right-2 z-10 p-1.5 bg-banana-yellow border-2 border-black shadow-neo-sm hover-reveal opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-110 active:scale-95"
              >
                <Download size={14} strokeWidth={3} />
              </button>
@@ -182,16 +182,16 @@ export const PromptCard: React.FC<PromptCardProps> = ({ prompt, canEdit, onEdit,
          <div className="flex gap-2">
             <button 
                 onClick={() => onLike(prompt.id)}
-                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-white flex items-center gap-1 text-[10px] md:text-xs font-bold active:bg-red-50 group h-8 md:h-auto min-w-[36px] md:min-w-[44px] justify-center"
+                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] motion-lift transition-[transform,box-shadow] duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] bg-white flex items-center gap-1 text-[10px] md:text-xs font-bold active:bg-red-50 group h-8 md:h-auto min-w-[36px] md:min-w-[44px] justify-center"
             >
-               <Heart className={`w-3 h-3 md:w-4 md:h-4 transition-transform group-hover:scale-110 ${prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"}`} />
+               <Heart className={`w-3 h-3 md:w-4 md:h-4 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:scale-110 ${prompt.likes > 0 ? "fill-red-500 text-red-500" : "text-black"}`} />
                {prompt.likes}
             </button>
             
             {canEdit && (
               <button 
                 onClick={() => onEdit(prompt)}
-                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] transition-all bg-banana-yellow h-8 md:h-auto min-w-[30px] md:min-w-[40px] flex items-center justify-center"
+                className="p-1 md:p-2 border-2 border-black shadow-neo-sm hover:shadow-neo hover:-translate-y-[1px] motion-lift transition-[transform,box-shadow] duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] bg-banana-yellow h-8 md:h-auto min-w-[30px] md:min-w-[40px] flex items-center justify-center"
               >
                 <Edit2 className="w-3 h-3 md:w-4 md:h-4" />
               </button>
